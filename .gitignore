@@ -1,0 +1,9 @@
+.streamlit/secrets.toml
+Data/
+Output/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.egg-info/
+.env
