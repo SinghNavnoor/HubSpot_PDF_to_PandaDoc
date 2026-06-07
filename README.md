@@ -30,8 +30,8 @@ The app opens at `http://localhost:8501`. Log in with the team credentials.
 
 For local runs, create `.streamlit/secrets.toml` with:
 ```toml
-USERNAME = "ubhteam"
-PASSWORD = "ubh2026"
+USERNAME = ******
+PASSWORD = ******
 ```
 
 This file is gitignored and never committed.
@@ -45,9 +45,10 @@ This file is gitignored and never committed.
 3. Set repository: `SinghNavnoor/bulk_check_request_ubh`, branch: `main`, file: `app.py`
 4. Click **Advanced settings** → paste into Secrets:
    ```toml
-   USERNAME = "ubhteam"
-   PASSWORD = "ubh2026"
+   USERNAME = ******
+   PASSWORD = ******
    ```
+
 5. Click **Deploy** — first deploy takes 3–5 minutes (LibreOffice installs automatically)
 
 To change the password: update the secret in the Streamlit Cloud dashboard → Reboot app. No code change needed.
