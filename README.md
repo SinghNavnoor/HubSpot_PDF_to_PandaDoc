@@ -88,15 +88,15 @@ The app expects a CSV exported from HubSpot with columns including:
 
 | Column | Example |
 |---|---|
-| Client Name | Christina Buller |
-| Payment Date (Today's Date) | 5/20/2026 |
-| Program (Sync) | BFH 8 Prevention |
+| Client Name | Client X |
+| Payment Date (Today's Date) | 5/20/2020 |
+| Program (Sync) | Housing Program |
 | Check Type | Monthly Rent |
 | Type of Assistance | Rent |
-| UBH Amount | 1645 |
+| UBH Amount | 2000 |
 | Client Rent Amount | 0 |
-| Check Payable to (Sync) | 1976 Chestnut LLC |
-| Landlord Address Sync | 3229 E Spring St, Long Beach, CA |
+| Check Payable to (Sync) | Y LLC |
+| Landlord Address Sync | 1234 New Street, Long Beach, CA |
 | Payment Month - Calc | June |
 | Payment Year - Calc | 2026 |
 
