@@ -24,8 +24,62 @@ CSS = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+
+/* Step cards — rounded, shadowed, tall */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 18px !important;
+    border: 1.5px solid #d0d5dd !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07) !important;
+    padding: 2rem !important;
+    min-height: 340px;
+}
+
+/* Generate button */
+div[data-testid="stButton"] > button[kind="primary"] {
+    height: 3.75rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: 10px;
+}
+
+/* Download button */
+div[data-testid="stDownloadButton"] > button {
+    height: 3.75rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    border-radius: 10px;
+}
 </style>
 """
+
+
+def _step_header(number: int, title: str, subtitle: str) -> None:
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:24px;">
+            <div style="
+                background:#1F6F5B;
+                color:white;
+                min-width:56px;
+                height:56px;
+                border-radius:50%;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:26px;
+                font-weight:800;
+                flex-shrink:0;
+                box-shadow: 0 2px 8px rgba(31,111,91,0.3);
+            ">{number}</div>
+            <div>
+                <div style="font-size:1.35rem; font-weight:700; color:#1F2933; line-height:1.2;">{title}</div>
+                <div style="font-size:0.9rem; color:#6b7280; margin-top:4px;">{subtitle}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _check_credentials(username: str, password: str) -> bool:
@@ -101,11 +155,6 @@ def _sidebar():
     with st.sidebar:
         st.markdown("### UBH Generator")
         st.markdown("---")
-        st.markdown("Signed in")
-        if st.button("Sign Out", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
-        st.markdown("---")
         st.caption(
             "Secure processing: files are deleted immediately after generation. "
             "No data is stored on this server."
@@ -115,18 +164,24 @@ def _sidebar():
 def _main_page():
     _sidebar()
 
-    st.markdown("## UBH Check Request Generator")
-    st.caption(
-        "Upload the monthly CSV and generate combined check request forms in one step."
-    )
+    title_col, signout_col = st.columns([8, 1])
+    with title_col:
+        st.markdown("## UBH Check Request Generator")
+        st.caption(
+            "Upload the monthly CSV and generate combined check request forms in one step."
+        )
+    with signout_col:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Sign Out", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
     st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
         with st.container(border=True):
-            st.markdown("**Step 1 — Upload CSV**")
-            st.caption("Select the monthly CSV file to process.")
+            _step_header(1, "Upload CSV", "Select the monthly CSV file to process")
             uploaded = st.file_uploader("", type=["csv"], label_visibility="collapsed")
             if uploaded is not None:
                 st.session_state.csv_bytes = uploaded.getvalue()
@@ -135,9 +190,14 @@ def _main_page():
 
     with col2:
         with st.container(border=True):
-            st.markdown("**Step 2 — Generate**")
-            st.caption("Create the combined check request document.")
+            _step_header(2, "Generate Document", "Create the combined check request file")
             has_file = bool(st.session_state.get("csv_bytes"))
+            if not has_file:
+                st.markdown(
+                    "<p style='color:#9ca3af; font-size:0.9rem; margin-bottom:16px;'>"
+                    "Upload a CSV file first to enable generation.</p>",
+                    unsafe_allow_html=True,
+                )
             if st.button(
                 "Generate",
                 type="primary",
@@ -161,9 +221,8 @@ def _main_page():
 
     with col3:
         with st.container(border=True):
-            st.markdown("**Step 3 — Download**")
+            _step_header(3, "Download DOCX", "Save the completed document to your computer")
             if st.session_state.get("docx_bytes"):
-                st.caption("Your combined check request file has been generated.")
                 st.success("Document ready")
                 st.download_button(
                     label="Download DOCX",
@@ -173,10 +232,11 @@ def _main_page():
                     use_container_width=True,
                 )
             else:
-                st.caption(
-                    "Upload a CSV and click Generate to create your DOCX."
+                st.markdown(
+                    "<p style='color:#9ca3af; font-size:0.9rem;'>"
+                    "Your document will appear here once generated.</p>",
+                    unsafe_allow_html=True,
                 )
-                st.markdown("No document yet")
 
 
 def main():
