@@ -151,19 +151,7 @@ def _login_page():
             st.caption("Authorized UBH team members only.")
 
 
-def _sidebar():
-    with st.sidebar:
-        st.markdown("### UBH Generator")
-        st.markdown("---")
-        st.caption(
-            "Secure processing: files are deleted immediately after generation. "
-            "No data is stored on this server."
-        )
-
-
 def _main_page():
-    _sidebar()
-
     title_col, signout_col = st.columns([8, 1])
     with title_col:
         st.markdown("## UBH Check Request Generator")

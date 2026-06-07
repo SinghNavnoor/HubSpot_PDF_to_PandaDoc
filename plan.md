@@ -38,11 +38,12 @@ A Streamlit web app that wraps the existing Python DOCX generator. Team members 
 - On success: `st.session_state.logged_in = True`
 
 **Main page (three-column layout):**
-- **Left panel** — bordered box with CSV file uploader. On upload, bytes stored in `st.session_state.csv_bytes`
-- **Middle** — Generate button (disabled until a file is uploaded). On click: writes CSV to a `tempfile.TemporaryDirectory`, runs the engine, stores DOCX bytes in `st.session_state.docx_bytes`, temp dir deleted automatically
-- **Right panel** — bordered box. Shows Download DOCX button once generated. Click downloads straight to browser Downloads folder — no Word app interaction
+- **Header** — app title + caption on the left, Sign Out button top-right
+- **Step 1 (Left panel)** — bordered card with CSV file uploader. On upload, bytes stored in `st.session_state.csv_bytes`, row count shown
+- **Step 2 (Middle panel)** — Generate button (disabled until a file is uploaded). On click: writes CSV to a `tempfile.TemporaryDirectory`, runs the engine, stores DOCX bytes in `st.session_state.docx_bytes`, temp dir deleted automatically
+- **Step 3 (Right panel)** — bordered card. Shows Download DOCX button once generated. Click downloads straight to browser Downloads folder — no Word app interaction
 
-**Sign Out** — clears all session state (data, generated file)
+**Sign Out** — top-right of header, clears all session state (data, generated file)
 
 ### Output format
 - **DOCX only** — PDF removed entirely. `docx2pdf` removed from dependencies.
