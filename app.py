@@ -1,4 +1,5 @@
 import csv
+import io
 import tempfile
 from pathlib import Path
 
@@ -9,7 +10,6 @@ from docxcompose.composer import Composer
 from csv_to_word_forms import (
     _detect_csv_encoding,
     build_column_map,
-    convert_docx_to_pdf,
     fill_template,
     get_row_values,
 )
@@ -20,13 +20,30 @@ TEMPLATE_PATH = (
     / "Rapid Rehousing Program Check Request Form - Template.docx"
 )
 
+CSS = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
+"""
+
 
 def _check_credentials(username: str, password: str) -> bool:
     return username == st.secrets["USERNAME"] and password == st.secrets["PASSWORD"]
 
 
-def _generate(csv_bytes: bytes) -> tuple[bytes, bytes | None]:
-    """Return (docx_bytes, pdf_bytes). pdf_bytes is None if conversion fails."""
+def _count_rows(csv_bytes: bytes) -> int:
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            text = csv_bytes.decode(enc)
+            reader = csv.DictReader(io.StringIO(text))
+            return sum(1 for _ in reader)
+        except Exception:
+            continue
+    return 0
+
+
+def _generate(csv_bytes: bytes) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         csv_path = tmp_path / "input.csv"
@@ -54,97 +71,121 @@ def _generate(csv_bytes: bytes) -> tuple[bytes, bytes | None]:
 
         docx_path = tmp_path / "Check_Requests_Combined.docx"
         composer.save(docx_path)
-        docx_bytes = docx_path.read_bytes()
-
-        pdf_path = tmp_path / "Check_Requests_Combined.pdf"
-        pdf_bytes = (
-            pdf_path.read_bytes()
-            if convert_docx_to_pdf(docx_path, pdf_path)
-            else None
-        )
-
-        return docx_bytes, pdf_bytes
+        return docx_path.read_bytes()
 
 
 def _login_page():
-    st.title("UBH Check Request Generator")
-    st.markdown("---")
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("## UBH Check Request Generator")
+            st.caption(
+                "Upload the monthly CSV and generate combined check request forms in one step."
+            )
+            st.markdown("---")
+            with st.form("login"):
+                st.markdown("**Sign In**")
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                if st.form_submit_button("Sign In", use_container_width=True):
+                    if _check_credentials(username, password):
+                        st.session_state.logged_in = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password.")
+            st.caption("Authorized UBH team members only.")
 
-    with st.form("login"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.form_submit_button("Sign In", use_container_width=True):
-            if _check_credentials(username, password):
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid username or password.")
+
+def _sidebar():
+    with st.sidebar:
+        st.markdown("### UBH Generator")
+        st.markdown("---")
+        st.markdown("Signed in")
+        if st.button("Sign Out", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+        st.markdown("---")
+        st.caption(
+            "Secure processing: files are deleted immediately after generation. "
+            "No data is stored on this server."
+        )
 
 
 def _main_page():
-    col_title, col_signout = st.columns([5, 1])
-    with col_title:
-        st.title("Check Request Generator")
-    with col_signout:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Sign Out"):
-            st.session_state.clear()
-            st.rerun()
+    _sidebar()
 
-    st.info(
-        "Files are processed and deleted immediately. No data is stored on this server.",
-        icon="🔒",
+    st.markdown("## UBH Check Request Generator")
+    st.caption(
+        "Upload the monthly CSV and generate combined check request forms in one step."
     )
     st.markdown("---")
 
-    uploaded = st.file_uploader("Upload CSV file", type=["csv"])
-    if uploaded is not None:
-        st.session_state.csv_bytes = uploaded.getvalue()
+    col1, col2, col3 = st.columns(3)
 
-    if st.session_state.get("csv_bytes"):
-        if st.button("Generate", type="primary", use_container_width=True):
-            with st.spinner("Generating forms — this may take a moment..."):
-                try:
-                    docx_bytes, pdf_bytes = _generate(st.session_state.csv_bytes)
-                    st.session_state.docx_bytes = docx_bytes
-                    st.session_state.pdf_bytes = pdf_bytes
-                    st.success("Done! Download your files below.")
-                except ValueError as exc:
-                    st.error(str(exc))
-                except Exception as exc:
-                    st.error(f"Generation failed: {exc}")
+    with col1:
+        with st.container(border=True):
+            st.markdown("**Step 1 — Upload CSV**")
+            st.caption("Select the monthly CSV file to process.")
+            uploaded = st.file_uploader("", type=["csv"], label_visibility="collapsed")
+            if uploaded is not None:
+                st.session_state.csv_bytes = uploaded.getvalue()
+                row_count = _count_rows(st.session_state.csv_bytes)
+                st.success(f"{uploaded.name} — {row_count} rows detected")
 
-    if st.session_state.get("docx_bytes") or st.session_state.get("pdf_bytes"):
-        st.markdown("### Downloads")
-        col_pdf, col_docx = st.columns(2)
-        with col_pdf:
-            if st.session_state.get("pdf_bytes"):
-                st.download_button(
-                    label="⬇ Download PDF",
-                    data=st.session_state.pdf_bytes,
-                    file_name="Check_Requests_Combined.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
-            else:
-                st.warning("PDF conversion unavailable on this server.")
-        with col_docx:
+    with col2:
+        with st.container(border=True):
+            st.markdown("**Step 2 — Generate**")
+            st.caption("Create the combined check request document.")
+            has_file = bool(st.session_state.get("csv_bytes"))
+            if st.button(
+                "Generate",
+                type="primary",
+                use_container_width=True,
+                disabled=not has_file,
+            ):
+                with st.spinner("Generating document..."):
+                    try:
+                        st.session_state.docx_bytes = _generate(
+                            st.session_state.csv_bytes
+                        )
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    except Exception as exc:
+                        st.error(
+                            "Could not generate the document. Please check that "
+                            "the CSV has the expected columns and try again."
+                        )
+                        with st.expander("Error details"):
+                            st.code(str(exc))
+
+    with col3:
+        with st.container(border=True):
+            st.markdown("**Step 3 — Download**")
             if st.session_state.get("docx_bytes"):
+                st.caption("Your combined check request file has been generated.")
+                st.success("Document ready")
                 st.download_button(
-                    label="⬇ Download DOCX",
+                    label="Download DOCX",
                     data=st.session_state.docx_bytes,
                     file_name="Check_Requests_Combined.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
                 )
+            else:
+                st.caption(
+                    "Upload a CSV and click Generate to create your DOCX."
+                )
+                st.markdown("No document yet")
 
 
 def main():
     st.set_page_config(
         page_title="UBH Check Request Generator",
         page_icon="📄",
-        layout="centered",
+        layout="wide",
     )
+    st.markdown(CSS, unsafe_allow_html=True)
 
     if not st.session_state.get("logged_in"):
         _login_page()
