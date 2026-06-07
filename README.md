@@ -30,8 +30,8 @@ The app opens at `http://localhost:8501`. Log in with the team credentials.
 
 For local runs, create `.streamlit/secrets.toml` with:
 ```toml
-USERNAME = "ubhteam"
-PASSWORD = "ubh2026"
+USERNAME = ******
+PASSWORD = ******
 ```
 
 This file is gitignored and never committed.
@@ -45,9 +45,10 @@ This file is gitignored and never committed.
 3. Set repository: `SinghNavnoor/bulk_check_request_ubh`, branch: `main`, file: `app.py`
 4. Click **Advanced settings** → paste into Secrets:
    ```toml
-   USERNAME = "ubhteam"
-   PASSWORD = "ubh2026"
+   USERNAME = ******
+   PASSWORD = ******
    ```
+
 5. Click **Deploy** — first deploy takes 3–5 minutes (LibreOffice installs automatically)
 
 To change the password: update the secret in the Streamlit Cloud dashboard → Reboot app. No code change needed.
@@ -87,15 +88,15 @@ The app expects a CSV exported from HubSpot with columns including:
 
 | Column | Example |
 |---|---|
-| Client Name | Christina Buller |
-| Payment Date (Today's Date) | 5/20/2026 |
-| Program (Sync) | BFH 8 Prevention |
+| Client Name | Client X |
+| Payment Date (Today's Date) | 5/20/2020 |
+| Program (Sync) | Housing Program |
 | Check Type | Monthly Rent |
 | Type of Assistance | Rent |
-| UBH Amount | 1645 |
+| UBH Amount | 2000 |
 | Client Rent Amount | 0 |
-| Check Payable to (Sync) | 1976 Chestnut LLC |
-| Landlord Address Sync | 3229 E Spring St, Long Beach, CA |
+| Check Payable to (Sync) | Y LLC |
+| Landlord Address Sync | 1234 New Street, Long Beach, CA |
 | Payment Month - Calc | June |
 | Payment Year - Calc | 2026 |
 
