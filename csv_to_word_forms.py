@@ -23,8 +23,17 @@ from pathlib import Path
 from docx import Document
 from docx.oxml.ns import qn
 from docx.enum.text import WD_UNDERLINE
-from docx.shared import Pt
+from docx.shared import Pt, RGBColor
 from docxcompose.composer import Composer
+
+# PandaDoc field tag embedded in the Director signature cell when
+# include_signature_tag=True. Bracket notation per
+# https://developers.pandadoc.com/docs/field-tags — [fieldType:role_____].
+# The role must match the recipient role sent in the PandaDoc API request
+# (Phase 3). Rendered in white so it is invisible on the printed form.
+# NOTE: exact syntax to be confirmed in the PandaDoc sandbox per the design spec.
+PANDADOC_SIGNATURE_ROLE = "ProgramDirector"
+PANDADOC_SIGNATURE_TAG = f"[signature:{PANDADOC_SIGNATURE_ROLE}____________]"
 
 # (CSV column header — any casing; matched via normalize_column_name, template label in Word doc)
 FIELD_MAPPING = [
@@ -654,11 +663,28 @@ def process_table(table, values: dict[str, str], replaced_count: dict[str, int])
                 process_table(nested_table, values, replaced_count)
 
 
+def insert_signature_tag_in_director_cell(doc: Document) -> bool:
+    """
+    Append the PandaDoc signature field tag (white text) to the Director
+    signature cell. Returns True if the cell was found and tagged.
+    """
+    for table in collect_all_tables(doc):
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text.strip().startswith("Director:"):
+                    para = cell.paragraphs[0]
+                    run = para.add_run(f" {PANDADOC_SIGNATURE_TAG}")
+                    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+                    return True
+    return False
+
+
 def fill_template(
     doc: Document,
     values: dict[str, str],
     row: dict,
     column_map: dict[str, str],
+    include_signature_tag: bool = False,
 ) -> None:
     """Fill the Word document template with values from a CSV row."""
     apply_arrears_and_assistance_table_rules(doc, row, column_map, values)
@@ -674,6 +700,54 @@ def fill_template(
         if "Comments:" in text and "Bedroom" in text and "FMR" in text:
             fill_comments_paragraph_underlined(para, values)
             break
+
+    if include_signature_tag:
+        if not insert_signature_tag_in_director_cell(doc):
+            warnings.warn(
+                "Signature tag requested but no 'Director:' cell found in template.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+
+def generate_combined_docx(
+    rows: list[dict],
+    template_path: Path | str,
+    output_path: Path | str,
+    include_signature_tag: bool = False,
+) -> Path | None:
+    """
+    Fill the template once per row dict and merge all forms into one combined
+    DOCX at output_path. Rows are plain dicts keyed by the CSV-style headers
+    FIELD_MAPPING expects (e.g. the output of hubspot_pull.get_rows_for_batch).
+
+    Returns the output path, or None if rows is empty (no file written).
+    """
+    template_path = Path(template_path)
+    output_path = Path(output_path)
+
+    if not rows:
+        return None
+
+    column_map = build_column_map(list(rows[0].keys()))
+
+    docs_to_merge = []
+    for row in rows:
+        values = get_row_values(row, column_map)
+        doc = Document(str(template_path))
+        fill_template(
+            doc, values, row, column_map, include_signature_tag=include_signature_tag
+        )
+        docs_to_merge.append(doc)
+
+    master = docs_to_merge[0]
+    composer = Composer(master)
+    for doc in docs_to_merge[1:]:
+        composer.append(doc)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    composer.save(str(output_path))
+    return output_path
 
 
 def sanitize_filename(name: str) -> str:
@@ -804,33 +878,15 @@ def main():
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Build column map from CSV headers and collect filled forms
     with open(csv_path, newline="", encoding=_detect_csv_encoding(csv_path)) as f:
-        reader = csv.DictReader(f)
-        headers = reader.fieldnames or []
-        column_map = build_column_map(headers)
+        rows = list(csv.DictReader(f))
 
-        docs_to_merge = []
-        for row in reader:
-            values = get_row_values(row, column_map)
-            doc = Document(template_path)
-            fill_template(doc, values, row, column_map)
-            docs_to_merge.append(doc)
-
-    if not docs_to_merge:
+    out_path = output_dir / "Check_Requests_Combined.docx"
+    if generate_combined_docx(rows, template_path, out_path) is None:
         print("No rows in CSV. Nothing to generate.")
         return 0
 
-    # Merge: first doc is base, append rest (each on new page)
-    master = docs_to_merge[0]
-    composer = Composer(master)
-    for doc in docs_to_merge[1:]:
-        composer.append(doc)
-
-    out_path = output_dir / "Check_Requests_Combined.docx"
-    composer.save(out_path)
-
-    print(f"\nGenerated Word: {out_path} ({len(docs_to_merge)} form(s))")
+    print(f"\nGenerated Word: {out_path} ({len(rows)} form(s))")
 
     if args.no_pdf:
         return 0
