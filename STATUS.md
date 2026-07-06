@@ -5,21 +5,26 @@ Tracks progress on the HubSpot → Bulk Word Doc → PandaDoc pipeline. See
 the full design.
 
 ## Phase 1 — HubSpot Pull
-Status: Code complete — blocked on HubSpot API key for live discovery + smoke test
+Status: Code complete — waiting on user-provided credentials and property names
 
 - [x] HubSpot API client (`hubspot_client.py`, 4 tests passing)
 - [x] Property discovery script (`hubspot_discover_properties.py`, 3 tests passing)
 - [x] Deal search + row mapping + batch orchestration (`hubspot_pull.py`, 5 tests passing)
-- [ ] **PENDING — HubSpot API key**: create a HubSpot private app with the
-      `crm.objects.deals.read` scope and paste its token into `.env` as
-      `HUBSPOT_API_KEY`. Required for the two remaining steps below.
-- [ ] Field mapping (`hubspot_field_map.py` exists but still has
-      `REPLACE_WITH_...` placeholders — run
-      `python3 hubspot_discover_properties.py` once the key is in `.env`,
-      then fill in the real internal property names and filter option values;
+- [ ] **PENDING — user to provide HubSpot internal property names** for the
+      16 mapped fields plus Paid Status, and the exact option values for the
+      two filters (`Check Type == "Monthly Rent"`, `Paid Status ==
+      "Pending Approval"`). These go into `hubspot_field_map.py`, replacing
+      its `REPLACE_WITH_...` placeholders;
       `tests/test_hubspot_field_map.py::test_no_leftover_placeholder_values`
-      passes once done)
+      passes once done. (Alternative if names are unknown: run
+      `python3 hubspot_discover_properties.py` once the API key is in `.env`.)
+- [ ] **PENDING — API keys (deferred, user will set up later)**: HubSpot
+      private-app token (`crm.objects.deals.read` scope) into `.env` as
+      `HUBSPOT_API_KEY`; PandaDoc sandbox/production keys as
+      `PANDADOC_API_KEY` (needed for Phase 3, plus `PROGRAM_DIRECTOR_NAME` /
+      `PROGRAM_DIRECTOR_EMAIL`).
 - [ ] Live smoke test against real HubSpot account (`python3 hubspot_pull.py`)
+      — needs both items above
 
 ## Phase 2 — Document Generation (signature tag addition)
 Status: Complete (2026-07-06)
