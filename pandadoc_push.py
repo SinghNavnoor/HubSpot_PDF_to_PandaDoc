@@ -33,15 +33,29 @@ DEFAULT_POLL_INTERVAL_SECONDS = 2
 DRAFT_STATUS = "document.draft"
 ERROR_STATUSES = {"document.error", "document.declined", "document.voided"}
 
-# Signature placement on each page (PandaDoc layout API). Coordinates tuned from
-# live document inspection and user grid (X=2, Y=8 on a 1–10 scale).
+# Director signature + signing-date placement on each page (PandaDoc layout API).
+# Signing date uses per-field settings.autofilled on API-created date fields only —
+# do NOT enable workspace-wide "Autofill with signing date" (other templates need
+# manual date fields, e.g. date of birth).
 PANDADOC_PAGE_WIDTH = 600
 PANDADOC_PAGE_HEIGHT = 850
+# Grid reference (1–10 scale): signature X=2, date X=8, row Y=9.9
 SIGNATURE_X_FRACTION = 0.2
-SIGNATURE_Y_FRACTION = 0.8
+SIGNATURE_Y_FRACTION = 0.99
+DATE_X_FRACTION = 0.78
 SIGNATURE_WIDTH = 120
 SIGNATURE_HEIGHT = 33
-SIGNATURE_FIELDS_CHUNK_SIZE = 50
+DATE_WIDTH = 90
+DATE_HEIGHT = 22
+SIGNATURE_FIELDS_CHUNK_SIZE = 25  # two fields per page (signature + date)
+
+REQUIRED_FIELD_SETTINGS = {"required": True}
+# `autofilled` enables PandaDoc's signing-date autofill on date fields (see
+# list fields response: settings.autofilled). Fills when the recipient signs.
+DATE_FIELD_SETTINGS = {
+    "required": True,
+    "autofilled": True,
+}
 
 
 class PandaDocAPIError(Exception):
@@ -180,24 +194,70 @@ def get_primary_recipient_id(details: dict) -> str:
     return recipient_id
 
 
+def _field_layout(
+    page: int,
+    x_fraction: float,
+    y_fraction: float,
+    width: int,
+    height: int,
+) -> dict:
+    return {
+        "page": page,
+        "position": {
+            "offset_x": round(PANDADOC_PAGE_WIDTH * x_fraction, 2),
+            "offset_y": round(PANDADOC_PAGE_HEIGHT * y_fraction, 2),
+            "anchor_point": "topleft",
+        },
+        "style": {
+            "width": width,
+            "height": height,
+        },
+    }
+
+
 def signature_field_payload(page: int, recipient_id: str) -> dict:
-    """One signature field on a single page at the configured layout."""
+    """One Director signature field on a single page at the configured layout."""
     return {
         "type": "signature",
         "assigned_to": recipient_id,
-        "layout": {
-            "page": page,
-            "position": {
-                "offset_x": round(PANDADOC_PAGE_WIDTH * SIGNATURE_X_FRACTION, 2),
-                "offset_y": round(PANDADOC_PAGE_HEIGHT * SIGNATURE_Y_FRACTION, 2),
-                "anchor_point": "topleft",
-            },
-            "style": {
-                "width": SIGNATURE_WIDTH,
-                "height": SIGNATURE_HEIGHT,
-            },
-        },
+        "settings": REQUIRED_FIELD_SETTINGS,
+        "layout": _field_layout(
+            page,
+            SIGNATURE_X_FRACTION,
+            SIGNATURE_Y_FRACTION,
+            SIGNATURE_WIDTH,
+            SIGNATURE_HEIGHT,
+        ),
     }
+
+
+def date_field_payload(page: int, recipient_id: str) -> dict:
+    """
+    Signing-date field beside the Director signature (right column).
+
+    Uses PandaDoc's signing-date autofill (`settings.autofilled`) so the date
+    reflects when the director signs, not the HubSpot create date.
+    """
+    return {
+        "type": "date",
+        "assigned_to": recipient_id,
+        "settings": DATE_FIELD_SETTINGS,
+        "layout": _field_layout(
+            page,
+            DATE_X_FRACTION,
+            SIGNATURE_Y_FRACTION,
+            DATE_WIDTH,
+            DATE_HEIGHT,
+        ),
+    }
+
+
+def director_fields_for_page(page: int, recipient_id: str) -> list[dict]:
+    """Signature + signing-date fields for one page."""
+    return [
+        signature_field_payload(page, recipient_id),
+        date_field_payload(page, recipient_id),
+    ]
 
 
 def place_signature_fields(
@@ -207,8 +267,8 @@ def place_signature_fields(
     recipient_id: str | None = None,
 ) -> int:
     """
-    Place one Director signature field per page via PandaDoc's fields API.
-    Returns the number of fields created.
+    Place Director signature and signing-date fields on each page via PandaDoc's
+    fields API. Returns the number of fields created.
     """
     if page_count < 1:
         raise ValueError("page_count must be at least 1")
@@ -221,7 +281,9 @@ def place_signature_fields(
     for start in range(1, page_count + 1, SIGNATURE_FIELDS_CHUNK_SIZE):
         end = min(start + SIGNATURE_FIELDS_CHUNK_SIZE, page_count + 1)
         fields = [
-            signature_field_payload(page, recipient_id) for page in range(start, end)
+            field
+            for page in range(start, end)
+            for field in director_fields_for_page(page, recipient_id)
         ]
         response = requests.post(
             f"{PANDADOC_API_BASE}{DOCUMENTS_PATH}/{document_id}/fields",
@@ -267,7 +329,10 @@ def push_and_send(
         if not page_count:
             raise ValueError("page_count is required for API signature placement")
         count = place_signature_fields(client, document_id, page_count)
-        print(f"Placed {count} signature field(s) via PandaDoc layout API.")
+        print(
+            f"Placed {count} field(s) (signature + signing date per page) "
+            "via PandaDoc layout API."
+        )
 
     send_document(client, document_id)
     print(f"Sent for signature to {recipient_email}.")

@@ -37,6 +37,20 @@ def properties_to_fetch(field_map: dict[str, str] | None = None) -> list[str]:
     return sorted(names)
 
 
+def batch_create_date_target(
+    reference_date: date | None = None,
+    create_day: int = FILTER_CREATE_DATE_DAY,
+) -> date:
+    """
+    The HubSpot createdate calendar day this batch includes.
+
+    Uses the month (and year) of reference_date — default today. When the job
+    runs on the 20th, today is the 20th and this returns the 13th of that month.
+    """
+    reference_date = reference_date or date.today()
+    return date(reference_date.year, reference_date.month, create_day)
+
+
 def create_date_filters_for_batch(
     reference_date: date | None = None,
     create_day: int = FILTER_CREATE_DATE_DAY,
@@ -44,9 +58,12 @@ def create_date_filters_for_batch(
     """
     Return HubSpot search filters for deals created on create_day of
     reference_date's month (default: today → 13th of current month).
+
+    Scheduled production runs on the 20th; reference_date defaults to that run
+    day, so July 20 pulls deals with createdate on July 13, October 20 pulls
+    October 13, and so on.
     """
-    reference_date = reference_date or date.today()
-    target = date(reference_date.year, reference_date.month, create_day)
+    target = batch_create_date_target(reference_date, create_day)
     start = datetime(target.year, target.month, target.day, tzinfo=timezone.utc)
     end = start + timedelta(days=1)
     return [

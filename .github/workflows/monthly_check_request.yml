@@ -1,0 +1,38 @@
+# Monthly HubSpot → DOCX → PandaDoc batch.
+#
+# Production schedule: 20th of each month at 9:00 AM Pacific (16:00 UTC).
+# Pulls deals whose HubSpot createdate is the 13th of that same month.
+#
+# Required GitHub repository secrets:
+#   HUBSPOT_API_KEY, PANDADOC_API_KEY,
+#   PROGRAM_DIRECTOR_NAME, PROGRAM_DIRECTOR_EMAIL
+#
+# Manual run: Actions → Monthly Check Request Batch → Run workflow
+
+name: Monthly Check Request Batch
+
+on:
+  schedule:
+    - cron: "0 16 20 * *"
+  workflow_dispatch:
+
+jobs:
+  run-batch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run batch pipeline
+        env:
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+          PANDADOC_API_KEY: ${{ secrets.PANDADOC_API_KEY }}
+          PROGRAM_DIRECTOR_NAME: ${{ secrets.PROGRAM_DIRECTOR_NAME }}
+          PROGRAM_DIRECTOR_EMAIL: ${{ secrets.PROGRAM_DIRECTOR_EMAIL }}
+        run: python3 run_batch.py

@@ -5,9 +5,12 @@ import pytest
 
 from csv_to_word_forms import PANDADOC_SIGNATURE_ROLE
 from pandadoc_push import (
+    DATE_FIELD_SETTINGS,
     PandaDocAPIError,
     PandaDocClient,
+    REQUIRED_FIELD_SETTINGS,
     create_document_from_docx,
+    date_field_payload,
     place_signature_fields,
     send_document,
     signature_field_payload,
@@ -140,9 +143,22 @@ def test_signature_field_payload_uses_grid_coordinates():
     assert field["assigned_to"] == "recipient-1"
     assert field["layout"]["page"] == 3
     assert field["layout"]["position"]["offset_x"] == 120.0
-    assert field["layout"]["position"]["offset_y"] == 680.0
+    assert field["layout"]["position"]["offset_y"] == 841.5
     assert field["layout"]["style"]["width"] == 120
     assert field["layout"]["style"]["height"] == 33
+    assert field["settings"] == REQUIRED_FIELD_SETTINGS
+
+
+def test_date_field_payload_placed_beside_signature():
+    field = date_field_payload(2, "recipient-1")
+    assert field["type"] == "date"
+    assert field["assigned_to"] == "recipient-1"
+    assert field["layout"]["page"] == 2
+    assert field["layout"]["position"]["offset_x"] == 468.0
+    assert field["layout"]["position"]["offset_y"] == 841.5
+    assert field["layout"]["style"]["width"] == 90
+    assert field["layout"]["style"]["height"] == 22
+    assert field["settings"] == DATE_FIELD_SETTINGS
 
 
 @patch("pandadoc_push.requests.post")
@@ -156,8 +172,14 @@ def test_place_signature_fields_posts_per_page(mock_details, mock_post):
     client = PandaDocClient("fake-key")
     count = place_signature_fields(client, "DOC123", page_count=2)
 
-    assert count == 2
+    assert count == 4
     body = mock_post.call_args[1]["json"]
-    assert len(body["fields"]) == 2
+    assert len(body["fields"]) == 4
+    assert body["fields"][0]["type"] == "signature"
     assert body["fields"][0]["layout"]["page"] == 1
-    assert body["fields"][1]["layout"]["page"] == 2
+    assert body["fields"][1]["type"] == "date"
+    assert body["fields"][1]["layout"]["page"] == 1
+    assert body["fields"][2]["type"] == "signature"
+    assert body["fields"][2]["layout"]["page"] == 2
+    assert body["fields"][3]["type"] == "date"
+    assert body["fields"][3]["layout"]["page"] == 2

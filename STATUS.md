@@ -27,9 +27,9 @@ Status: Complete (2026-07-06)
       PandaDoc document name: `Check Request - {m_p} - {createdate}`.
       Option C: upload as document and send to director.
 - [x] **Signature placement (2026-07-07):** moved from oversized DOCX field
-      tags to PandaDoc layout API — 120×33 pt fields at grid X=2, Y=8
-      (20% / 80% of page). Test doc `TEST Signature Layout v4 (2 pages)`
-      sent for review.
+      tags to PandaDoc layout API — signature at X=2, Y=9.9; signing-date at
+      X=8, same row. Both required; date uses per-field signing-date autofill
+      (`settings.autofilled` via API — no workspace-wide date default needed).
 
 ## Phase 2 — Document Generation (signature tag addition)
 Status: Complete (2026-07-06)

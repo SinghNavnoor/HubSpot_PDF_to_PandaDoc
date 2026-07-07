@@ -1,30 +1,37 @@
 #!/usr/bin/env python3
 """
-Manual orchestrator for the HubSpot → combined DOCX → PandaDoc pipeline.
+Orchestrator for the HubSpot → combined DOCX → PandaDoc pipeline.
 
 Runs the three phases in order:
   1. Pull matching Financial Assistance deals from HubSpot (hubspot_pull)
-  2. Fill + merge the Word template into one combined DOCX, with the PandaDoc
-     signature tag on every page's Director line (csv_to_word_forms)
-  3. Upload to PandaDoc and auto-send to the Program Director (pandadoc_push)
+  2. Fill + merge the Word template into one combined DOCX (csv_to_word_forms)
+  3. Upload to PandaDoc, place signature/date fields, send (pandadoc_push)
+
+Monthly production schedule (automated via GitHub Actions on the 20th):
+  - Job runs on the 20th of each month
+  - Includes deals whose HubSpot createdate is the 13th of that same month
+    (July 20 → July 13 deals, October 20 → October 13 deals, etc.)
 
 Usage:
-    python3 run_batch.py            # full pipeline
-    python3 run_batch.py --dry-run  # phases 1+2 only; saves the DOCX locally,
-                                    # makes no PandaDoc API call
+    python3 run_batch.py                         # production batch (create-date filter on)
+    python3 run_batch.py --dry-run               # phases 1+2 only; no PandaDoc send
+    python3 run_batch.py --test-batch            # skip create-date filter (testing)
+    python3 run_batch.py --reference-date 2026-06-20   # replay a specific month
 """
 from __future__ import annotations
 
 import argparse
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from csv_to_word_forms import generate_combined_docx
 from hubspot_client import HubSpotClient
-from hubspot_pull import pull_batch
+from hubspot_field_map import BATCH_SCHEDULED_RUN_DAY, FILTER_CREATE_DATE_DAY
+from hubspot_pull import batch_create_date_target, pull_batch
 from pandadoc_push import push_and_send
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -42,13 +49,24 @@ def run(
     template_path: Path | str = DEFAULT_TEMPLATE,
     *,
     test_batch: bool = False,
+    reference_date: date | None = None,
 ) -> int:
     load_dotenv()
+
+    reference_date = reference_date or date.today()
+    if not test_batch:
+        target = batch_create_date_target(reference_date)
+        print(
+            f"Batch filter: HubSpot createdate on {target.isoformat()} "
+            f"(day {FILTER_CREATE_DATE_DAY} of {target.strftime('%B %Y')}). "
+            f"Scheduled production run day: {BATCH_SCHEDULED_RUN_DAY}."
+        )
 
     # Phase 1 — HubSpot pull
     client = HubSpotClient(os.environ.get("HUBSPOT_API_KEY", ""))
     rows, document_name = pull_batch(
         client,
+        reference_date=reference_date,
         require_create_date=not test_batch,
         test_batch=test_batch,
     )
@@ -93,7 +111,17 @@ def main() -> int:
     parser.add_argument(
         "--test-batch",
         action="store_true",
-        help="Testing only: skip create-date filter (Monthly Rent + Pending Approval only)",
+        help="Testing only: skip create-date filter (Monthly Rent + Pending Approval + Rent)",
+    )
+    parser.add_argument(
+        "--reference-date",
+        type=date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help=(
+            "Month/year for the create-date filter (default: today). "
+            f"Production runs on the {BATCH_SCHEDULED_RUN_DAY}th; deals from the "
+            f"{FILTER_CREATE_DATE_DAY}th of that month are included."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -105,6 +133,7 @@ def main() -> int:
         dry_run=args.dry_run,
         output_path=Path(args.output),
         test_batch=args.test_batch,
+        reference_date=args.reference_date,
     )
 
 

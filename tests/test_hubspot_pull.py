@@ -4,10 +4,12 @@ import pytest
 
 from hubspot_field_map import (
     ASSISTANCE_PAYMENT_MONTH_PROPERTY,
+    BATCH_SCHEDULED_RUN_DAY,
     FILTER_CREATE_DATE_DAY,
     HUBSPOT_CREATEDATE_PROPERTY,
 )
 from hubspot_pull import (
+    batch_create_date_target,
     batch_search_filters,
     build_document_name,
     create_date_filters_for_batch,
@@ -28,6 +30,7 @@ FAKE_FIELD_MAP = {
 
 def test_create_date_filters_for_july_2026():
     filters = create_date_filters_for_batch(date(2026, 7, 20))
+    assert batch_create_date_target(date(2026, 7, 20)) == date(2026, 7, 13)
     assert len(filters) == 2
     assert filters[0]["propertyName"] == HUBSPOT_CREATEDATE_PROPERTY
     assert filters[0]["operator"] == "GTE"
@@ -208,3 +211,9 @@ def test_get_rows_for_batch_combines_search_and_mapping():
 
 def test_filter_create_date_day_is_13():
     assert FILTER_CREATE_DATE_DAY == 13
+    assert BATCH_SCHEDULED_RUN_DAY == 20
+
+
+def test_batch_create_date_target_uses_reference_month():
+    assert batch_create_date_target(date(2026, 10, 20)) == date(2026, 10, 13)
+    assert batch_create_date_target(date(2026, 3, 20)) == date(2026, 3, 13)
