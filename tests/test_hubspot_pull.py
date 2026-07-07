@@ -66,6 +66,17 @@ def test_hubspot_deal_to_row_defaults_missing_fields_to_empty_string():
     assert row == {"Client Name": "", "Program (Sync)": ""}
 
 
+def test_hubspot_deal_to_row_translates_internal_option_values():
+    field_map = {"over_fmr": "Over FMR?"}
+
+    assert hubspot_deal_to_row({"over_fmr": "true"}, field_map) == {"Over FMR?": "Yes"}
+    assert hubspot_deal_to_row({"over_fmr": "false"}, field_map) == {"Over FMR?": "No"}
+    # Unknown values pass through untouched
+    assert hubspot_deal_to_row({"over_fmr": "maybe"}, field_map) == {
+        "Over FMR?": "maybe"
+    }
+
+
 def test_get_rows_for_batch_combines_search_and_mapping():
     client = Mock()
     client.post.return_value = {

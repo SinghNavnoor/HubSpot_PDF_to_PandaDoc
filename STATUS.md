@@ -5,26 +5,23 @@ Tracks progress on the HubSpot → Bulk Word Doc → PandaDoc pipeline. See
 the full design.
 
 ## Phase 1 — HubSpot Pull
-Status: Code complete — waiting on user-provided credentials and property names
+Status: Complete (2026-07-06)
 
 - [x] HubSpot API client (`hubspot_client.py`, 4 tests passing)
 - [x] Property discovery script (`hubspot_discover_properties.py`, 3 tests passing)
-- [x] Deal search + row mapping + batch orchestration (`hubspot_pull.py`, 5 tests passing)
-- [ ] **PENDING — user to provide HubSpot internal property names** for the
-      16 mapped fields plus Paid Status, and the exact option values for the
-      two filters (`Check Type == "Monthly Rent"`, `Paid Status ==
-      "Pending Approval"`). These go into `hubspot_field_map.py`, replacing
-      its `REPLACE_WITH_...` placeholders;
-      `tests/test_hubspot_field_map.py::test_no_leftover_placeholder_values`
-      passes once done. (Alternative if names are unknown: run
-      `python3 hubspot_discover_properties.py` once the API key is in `.env`.)
-- [ ] **PENDING — API keys (deferred, user will set up later)**: HubSpot
-      private-app token (`crm.objects.deals.read` scope) into `.env` as
-      `HUBSPOT_API_KEY`; PandaDoc sandbox/production keys as
-      `PANDADOC_API_KEY` (needed for Phase 3, plus `PROGRAM_DIRECTOR_NAME` /
-      `PROGRAM_DIRECTOR_EMAIL`).
-- [ ] Live smoke test against real HubSpot account (`python3 hubspot_pull.py`)
-      — needs both items above
+- [x] Deal search + row mapping + batch orchestration (`hubspot_pull.py`, 6 tests passing)
+- [x] HubSpot service key (Bulk Check Requests, `crm.objects.deals.read`)
+      added to `.env` as `HUBSPOT_API_KEY`
+- [x] Field mapping filled from live discovery (`hubspot_field_map.py`, 7
+      tests passing) — notable internal names: `type_of_rental_assitance`
+      (HubSpot's own typo), `ubh_amount_calc` (plain `ubh_amount` is
+      Historical), `mw`/`y` for Payment Month/Year - Calc; `over_fmr` stores
+      true/false, translated to Yes/No via `ENGINE_VALUE_TRANSLATIONS`
+- [x] Live smoke test — pulled 126 row(s) matching the batch filter, all 16
+      row keys correct, per-field fill rates spot-checked (Check Type 126/126,
+      UBH Amount 122/126, etc.)
+- [x] End-to-end dry run: `python3 run_batch.py --dry-run` generated the
+      126-form combined DOCX in `Output/`
 
 ## Phase 2 — Document Generation (signature tag addition)
 Status: Complete (2026-07-06)
@@ -54,11 +51,9 @@ Status: Code complete (2026-07-06) — untested against live PandaDoc
 
 ## Remaining before first real run
 
-1. User provides HubSpot internal property names + filter option values →
-   fill `hubspot_field_map.py`
-2. User adds `HUBSPOT_API_KEY`, `PANDADOC_API_KEY`,
-   `PROGRAM_DIRECTOR_NAME`, `PROGRAM_DIRECTOR_EMAIL` to `.env`
-3. Live HubSpot smoke test: `python3 hubspot_pull.py`
-4. Dry run + eyeball the DOCX: `python3 run_batch.py --dry-run`
-5. PandaDoc sandbox send, verify signature fields, then first real run:
-   `python3 run_batch.py`
+1. User reviews the dry-run DOCX (`Output/Check_Requests_Combined.docx`,
+   126 forms) for field placement/formatting
+2. User adds `PANDADOC_API_KEY`, `PROGRAM_DIRECTOR_NAME`,
+   `PROGRAM_DIRECTOR_EMAIL` to `.env`
+3. PandaDoc sandbox send, verify the signature tag becomes a real field on
+   every page, then first real run: `python3 run_batch.py`

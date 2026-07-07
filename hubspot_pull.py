@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from hubspot_client import HubSpotClient
 from hubspot_field_map import (
+    ENGINE_VALUE_TRANSLATIONS,
     FILTER_CHECK_TYPE_PROPERTY,
     FILTER_CHECK_TYPE_VALUE,
     FILTER_PAID_STATUS_PROPERTY,
@@ -68,7 +69,11 @@ def hubspot_deal_to_row(deal_properties: dict, field_map: dict[str, str]) -> dic
     """Map one HubSpot deal's raw properties dict to an engine-header-keyed row dict."""
     row: dict[str, str] = {}
     for hubspot_name, engine_header in field_map.items():
-        row[engine_header] = deal_properties.get(hubspot_name) or ""
+        value = deal_properties.get(hubspot_name) or ""
+        translations = ENGINE_VALUE_TRANSLATIONS.get(engine_header)
+        if translations:
+            value = translations.get(value, value)
+        row[engine_header] = value
     return row
 
 
