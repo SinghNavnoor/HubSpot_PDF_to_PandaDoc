@@ -61,9 +61,13 @@ def create_date_filters_for_batch(
     ]
 
 
-def batch_search_filters(reference_date: date | None = None) -> list[dict]:
-    """All filters for the monthly batch: rent type, paid status, create date."""
-    return [
+def batch_search_filters(
+    reference_date: date | None = None,
+    *,
+    require_create_date: bool = True,
+) -> list[dict]:
+    """All filters for the monthly batch: rent type, paid status, optional create date."""
+    filters = [
         {
             "propertyName": FILTER_CHECK_TYPE_PROPERTY,
             "operator": "EQ",
@@ -74,8 +78,10 @@ def batch_search_filters(reference_date: date | None = None) -> list[dict]:
             "operator": "EQ",
             "value": FILTER_PAID_STATUS_VALUE,
         },
-        *create_date_filters_for_batch(reference_date),
     ]
+    if require_create_date:
+        filters.extend(create_date_filters_for_batch(reference_date))
+    return filters
 
 
 def format_hubspot_createdate(raw: str) -> str:
@@ -95,6 +101,7 @@ def build_document_name(
     deal_properties_list: list[dict],
     *,
     prefix: str = DOCUMENT_NAME_PREFIX,
+    test_batch: bool = False,
 ) -> str:
     """
     Build the PandaDoc document name from batch metadata on the pulled deals.
@@ -105,6 +112,9 @@ def build_document_name(
     """
     if not deal_properties_list:
         raise ValueError("Cannot build document name from an empty batch")
+
+    if test_batch:
+        return f"{prefix} - TEST - {date.today().isoformat()}"
 
     months: set[str] = set()
     dates: set[str] = set()
@@ -145,6 +155,8 @@ def search_matching_deals(
     client: HubSpotClient,
     field_map: dict[str, str] | None = None,
     reference_date: date | None = None,
+    *,
+    require_create_date: bool = True,
 ) -> list[dict]:
     """Return raw HubSpot deal property dicts matching the monthly batch filter."""
     field_map = field_map or HUBSPOT_TO_ENGINE_HEADER
@@ -154,7 +166,9 @@ def search_matching_deals(
 
     while True:
         body = {
-            "filterGroups": [{"filters": batch_search_filters(reference_date)}],
+            "filterGroups": [
+                {"filters": batch_search_filters(reference_date, require_create_date=require_create_date)}
+            ],
             "properties": properties,
             "limit": SEARCH_PAGE_LIMIT,
         }
@@ -189,12 +203,19 @@ def pull_batch(
     client: HubSpotClient,
     field_map: dict[str, str] | None = None,
     reference_date: date | None = None,
+    *,
+    require_create_date: bool = True,
+    test_batch: bool = False,
 ) -> tuple[list[dict], str]:
     """Pull deals, map to engine rows, and build the PandaDoc document name."""
     field_map = field_map or HUBSPOT_TO_ENGINE_HEADER
-    deals = search_matching_deals(client, field_map, reference_date)
+    deals = search_matching_deals(
+        client, field_map, reference_date, require_create_date=require_create_date
+    )
     rows = [hubspot_deal_to_row(deal, field_map) for deal in deals]
-    document_name = build_document_name(deals) if deals else ""
+    document_name = (
+        build_document_name(deals, test_batch=test_batch) if deals else ""
+    )
     return rows, document_name
 
 

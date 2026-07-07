@@ -40,12 +40,18 @@ def run(
     dry_run: bool,
     output_path: Path | str = DEFAULT_OUTPUT,
     template_path: Path | str = DEFAULT_TEMPLATE,
+    *,
+    test_batch: bool = False,
 ) -> int:
     load_dotenv()
 
     # Phase 1 — HubSpot pull
     client = HubSpotClient(os.environ.get("HUBSPOT_API_KEY", ""))
-    rows, document_name = pull_batch(client)
+    rows, document_name = pull_batch(
+        client,
+        require_create_date=not test_batch,
+        test_batch=test_batch,
+    )
     print(f"Phase 1: pulled {len(rows)} row(s) from HubSpot.")
     if not rows:
         print("Zero deals match the batch filter. Nothing to generate; exiting.")
@@ -84,12 +90,21 @@ def main() -> int:
         help="Run phases 1+2 only; save the combined DOCX, skip PandaDoc",
     )
     parser.add_argument(
+        "--test-batch",
+        action="store_true",
+        help="Testing only: skip create-date filter (Monthly Rent + Pending Approval only)",
+    )
+    parser.add_argument(
         "--output",
         default=str(DEFAULT_OUTPUT),
         help=f"Combined DOCX output path (default: {DEFAULT_OUTPUT})",
     )
     args = parser.parse_args()
-    return run(dry_run=args.dry_run, output_path=Path(args.output))
+    return run(
+        dry_run=args.dry_run,
+        output_path=Path(args.output),
+        test_batch=args.test_batch,
+    )
 
 
 if __name__ == "__main__":
