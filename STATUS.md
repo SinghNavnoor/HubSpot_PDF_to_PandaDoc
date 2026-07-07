@@ -27,19 +27,17 @@ Status: Complete (2026-07-06)
 Status: Complete (2026-07-06)
 
 - [x] Opt-in `include_signature_tag` on `fill_template` — writes the PandaDoc
-      field tag `[signature:ProgramDirector____________]` in white text into
+      field tag `{signature:ProgramDirector____________}` in white text into
       the Director signature cell; default off, zero effect on other callers
 - [x] `generate_combined_docx(rows, template_path, output_path,
       include_signature_tag=False)` — builds the combined DOCX from in-memory
       row dicts (e.g. `hubspot_pull.get_rows_for_batch()` output); CLI
       refactored to reuse it (7 tests passing)
-- [ ] **PENDING — verify tag syntax in PandaDoc sandbox** (design spec open
-      item): confirm `[signature:Role___]` bracket notation renders as a real
-      signature field on upload with `parse_form_fields: false`, before
-      Phase 3 goes live
+- [x] Tag syntax verified against live PandaDoc (design spec open item
+      closed — see Phase 3 verification below)
 
 ## Phase 3 — PandaDoc Push
-Status: Code complete (2026-07-06) — untested against live PandaDoc
+Status: Complete and verified live (2026-07-06)
 
 - [x] `pandadoc_push.py` — DOCX upload (field tags parsed), Program Director
       recipient bound to the `ProgramDirector` signature role, processing
