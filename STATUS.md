@@ -42,4 +42,23 @@ Status: Complete (2026-07-06)
       Phase 3 goes live
 
 ## Phase 3 — PandaDoc Push
-Status: Not started
+Status: Code complete (2026-07-06) — untested against live PandaDoc
+
+- [x] `pandadoc_push.py` — DOCX upload (field tags parsed), Program Director
+      recipient bound to the `ProgramDirector` signature role, processing
+      poll, auto-send; loud failures (7 tests passing)
+- [x] `run_batch.py` — orchestrator chaining Phase 1 → 2 → 3, with
+      `--dry-run` running phases 1+2 only (3 tests passing)
+- [ ] **PENDING — needs API keys**: sandbox test (verify tag → signature
+      field on every page, then send) before pointing at production
+
+## Remaining before first real run
+
+1. User provides HubSpot internal property names + filter option values →
+   fill `hubspot_field_map.py`
+2. User adds `HUBSPOT_API_KEY`, `PANDADOC_API_KEY`,
+   `PROGRAM_DIRECTOR_NAME`, `PROGRAM_DIRECTOR_EMAIL` to `.env`
+3. Live HubSpot smoke test: `python3 hubspot_pull.py`
+4. Dry run + eyeball the DOCX: `python3 run_batch.py --dry-run`
+5. PandaDoc sandbox send, verify signature fields, then first real run:
+   `python3 run_batch.py`
