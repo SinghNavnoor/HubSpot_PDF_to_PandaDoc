@@ -8,7 +8,9 @@ from pandadoc_push import (
     PandaDocAPIError,
     PandaDocClient,
     create_document_from_docx,
+    place_signature_fields,
     send_document,
+    signature_field_payload,
     wait_until_draft,
 )
 
@@ -130,3 +132,32 @@ def test_send_document_posts_to_send_endpoint(mock_post):
     assert result["status"] == "document.sent"
     called_url = mock_post.call_args[0][0]
     assert called_url == "https://api.pandadoc.com/public/v1/documents/DOC123/send"
+
+
+def test_signature_field_payload_uses_grid_coordinates():
+    field = signature_field_payload(3, "recipient-1")
+    assert field["type"] == "signature"
+    assert field["assigned_to"] == "recipient-1"
+    assert field["layout"]["page"] == 3
+    assert field["layout"]["position"]["offset_x"] == 120.0
+    assert field["layout"]["position"]["offset_y"] == 680.0
+    assert field["layout"]["style"]["width"] == 120
+    assert field["layout"]["style"]["height"] == 33
+
+
+@patch("pandadoc_push.requests.post")
+@patch("pandadoc_push.get_document_details")
+def test_place_signature_fields_posts_per_page(mock_details, mock_post):
+    mock_details.return_value = {
+        "recipients": [{"id": "recipient-1", "email": "dir@example.com"}]
+    }
+    mock_post.return_value = Mock(ok=True, json=Mock(return_value={"fields": []}))
+
+    client = PandaDocClient("fake-key")
+    count = place_signature_fields(client, "DOC123", page_count=2)
+
+    assert count == 2
+    body = mock_post.call_args[1]["json"]
+    assert len(body["fields"]) == 2
+    assert body["fields"][0]["layout"]["page"] == 1
+    assert body["fields"][1]["layout"]["page"] == 2

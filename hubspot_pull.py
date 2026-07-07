@@ -17,6 +17,8 @@ from hubspot_field_map import (
     FILTER_CREATE_DATE_DAY,
     FILTER_PAID_STATUS_PROPERTY,
     FILTER_PAID_STATUS_VALUE,
+    FILTER_TYPE_OF_ASSISTANCE_PROPERTY,
+    FILTER_TYPE_OF_ASSISTANCE_VALUE,
     HUBSPOT_CREATEDATE_PROPERTY,
     HUBSPOT_TO_ENGINE_HEADER,
 )
@@ -77,6 +79,11 @@ def batch_search_filters(
             "propertyName": FILTER_PAID_STATUS_PROPERTY,
             "operator": "EQ",
             "value": FILTER_PAID_STATUS_VALUE,
+        },
+        {
+            "propertyName": FILTER_TYPE_OF_ASSISTANCE_PROPERTY,
+            "operator": "EQ",
+            "value": FILTER_TYPE_OF_ASSISTANCE_VALUE,
         },
     ]
     if require_create_date:

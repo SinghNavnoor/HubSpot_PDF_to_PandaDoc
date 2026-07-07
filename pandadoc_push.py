@@ -33,6 +33,16 @@ DEFAULT_POLL_INTERVAL_SECONDS = 2
 DRAFT_STATUS = "document.draft"
 ERROR_STATUSES = {"document.error", "document.declined", "document.voided"}
 
+# Signature placement on each page (PandaDoc layout API). Coordinates tuned from
+# live document inspection and user grid (X=2, Y=8 on a 1–10 scale).
+PANDADOC_PAGE_WIDTH = 600
+PANDADOC_PAGE_HEIGHT = 850
+SIGNATURE_X_FRACTION = 0.2
+SIGNATURE_Y_FRACTION = 0.8
+SIGNATURE_WIDTH = 120
+SIGNATURE_HEIGHT = 33
+SIGNATURE_FIELDS_CHUNK_SIZE = 50
+
 
 class PandaDocAPIError(Exception):
     """Raised when the PandaDoc API returns a non-2xx response or error status."""
@@ -150,14 +160,92 @@ def send_document(client: PandaDocClient, document_id: str) -> dict:
     return _parse(response)
 
 
+def get_document_details(client: PandaDocClient, document_id: str) -> dict:
+    response = requests.get(
+        f"{PANDADOC_API_BASE}{DOCUMENTS_PATH}/{document_id}/details",
+        headers=client.headers,
+        timeout=60,
+    )
+    return _parse(response)
+
+
+def get_primary_recipient_id(details: dict) -> str:
+    """Return the first recipient id from document details."""
+    recipients = details.get("recipients") or []
+    if not recipients:
+        raise PandaDocAPIError(0, "Document has no recipients")
+    recipient_id = recipients[0].get("id")
+    if not recipient_id:
+        raise PandaDocAPIError(0, "Recipient id missing from document details")
+    return recipient_id
+
+
+def signature_field_payload(page: int, recipient_id: str) -> dict:
+    """One signature field on a single page at the configured layout."""
+    return {
+        "type": "signature",
+        "assigned_to": recipient_id,
+        "layout": {
+            "page": page,
+            "position": {
+                "offset_x": round(PANDADOC_PAGE_WIDTH * SIGNATURE_X_FRACTION, 2),
+                "offset_y": round(PANDADOC_PAGE_HEIGHT * SIGNATURE_Y_FRACTION, 2),
+                "anchor_point": "topleft",
+            },
+            "style": {
+                "width": SIGNATURE_WIDTH,
+                "height": SIGNATURE_HEIGHT,
+            },
+        },
+    }
+
+
+def place_signature_fields(
+    client: PandaDocClient,
+    document_id: str,
+    page_count: int,
+    recipient_id: str | None = None,
+) -> int:
+    """
+    Place one Director signature field per page via PandaDoc's fields API.
+    Returns the number of fields created.
+    """
+    if page_count < 1:
+        raise ValueError("page_count must be at least 1")
+
+    if recipient_id is None:
+        details = get_document_details(client, document_id)
+        recipient_id = get_primary_recipient_id(details)
+
+    created = 0
+    for start in range(1, page_count + 1, SIGNATURE_FIELDS_CHUNK_SIZE):
+        end = min(start + SIGNATURE_FIELDS_CHUNK_SIZE, page_count + 1)
+        fields = [
+            signature_field_payload(page, recipient_id) for page in range(start, end)
+        ]
+        response = requests.post(
+            f"{PANDADOC_API_BASE}{DOCUMENTS_PATH}/{document_id}/fields",
+            headers={**client.headers, "Content-Type": "application/json"},
+            json={"fields": fields},
+            timeout=120,
+        )
+        _parse(response)
+        created += len(fields)
+
+    return created
+
+
 def push_and_send(
     docx_path: Path | str,
     api_key: str,
     recipient_name: str,
     recipient_email: str,
     document_name: str | None = None,
+    page_count: int | None = None,
+    *,
+    use_api_signature_placement: bool = True,
 ) -> str:
-    """Full Phase 3: upload, wait for processing, send. Returns document id."""
+    """Full Phase 3: upload, wait for processing, place signatures, send."""
     docx_path = Path(docx_path)
     if not docx_path.is_file():
         raise FileNotFoundError(f"Combined DOCX not found: {docx_path}")
@@ -174,6 +262,12 @@ def push_and_send(
 
     wait_until_draft(client, document_id)
     print("Document processed (draft).")
+
+    if use_api_signature_placement:
+        if not page_count:
+            raise ValueError("page_count is required for API signature placement")
+        count = place_signature_fields(client, document_id, page_count)
+        print(f"Placed {count} signature field(s) via PandaDoc layout API.")
 
     send_document(client, document_id)
     print(f"Sent for signature to {recipient_email}.")

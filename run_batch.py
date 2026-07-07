@@ -58,9 +58,9 @@ def run(
         return 0
     print(f"Phase 1: PandaDoc document name will be {document_name!r}.")
 
-    # Phase 2 — combined DOCX with signature tags
+    # Phase 2 — combined DOCX (signature fields added via PandaDoc API in Phase 3)
     out = generate_combined_docx(
-        rows, template_path, output_path, include_signature_tag=True
+        rows, template_path, output_path, include_signature_tag=False
     )
     print(f"Phase 2: generated {out} ({len(rows)} form(s)).")
 
@@ -75,6 +75,7 @@ def run(
         recipient_name=os.environ.get("PROGRAM_DIRECTOR_NAME", ""),
         recipient_email=os.environ.get("PROGRAM_DIRECTOR_EMAIL", ""),
         document_name=document_name,
+        page_count=len(rows),
     )
     print(f"Phase 3: PandaDoc document {document_id} sent.")
     return 0

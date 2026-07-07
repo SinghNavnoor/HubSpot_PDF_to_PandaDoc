@@ -26,19 +26,10 @@ from docx.enum.text import WD_UNDERLINE
 from docx.shared import Pt, RGBColor
 from docxcompose.composer import Composer
 
-# PandaDoc field tag embedded in the Director signature cell when
-# include_signature_tag=True. The role must match the recipient role sent in
-# the PandaDoc API request (Phase 3). Rendered in white so it is invisible on
-# the printed form.
-# Verified live against PandaDoc on 2026-07-06: square-bracket notation from
-# developers.pandadoc.com/docs/field-tags is silently ignored on this account;
-# the curly-brace notation ({signature:Role___}, per PandaDoc's Help Center
-# "Field tags recognition" article) parses into a real signature field and
-# upgrades the recipient from CC to signer. Trailing underscores set width.
+# PandaDoc field tag (legacy fallback if API placement is disabled). Curly-brace
+# notation verified live 2026-07-06. Underscores control width — keep short.
 PANDADOC_SIGNATURE_ROLE = "ProgramDirector"
-PANDADOC_SIGNATURE_TAG = (
-    "{signature:" + PANDADOC_SIGNATURE_ROLE + "____________}"
-)
+PANDADOC_SIGNATURE_TAG = "{s:" + PANDADOC_SIGNATURE_ROLE + "___}"
 
 # (CSV column header — any casing; matched via normalize_column_name, template label in Word doc)
 FIELD_MAPPING = [

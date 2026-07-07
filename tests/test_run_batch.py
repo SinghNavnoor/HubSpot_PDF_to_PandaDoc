@@ -26,7 +26,7 @@ def test_dry_run_skips_pandadoc(mock_client, mock_pull, mock_generate, mock_push
     assert exit_code == 0
     assert out.is_file()
     mock_generate.assert_called_once()
-    assert mock_generate.call_args[1]["include_signature_tag"] is True
+    assert mock_generate.call_args[1]["include_signature_tag"] is False
     mock_push.assert_not_called()
 
 
@@ -50,6 +50,7 @@ def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock
     assert kwargs["recipient_name"] == "Jane Director"
     assert kwargs["recipient_email"] == "jane@example.com"
     assert kwargs["document_name"] == "Check Request - July - 2026-07-13"
+    assert kwargs["page_count"] == 1
 
 
 @patch("run_batch.push_and_send")

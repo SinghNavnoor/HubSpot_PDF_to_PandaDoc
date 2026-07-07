@@ -23,11 +23,13 @@ Status: Complete (2026-07-06)
 - [x] End-to-end dry run: `python3 run_batch.py --dry-run` generated the
       126-form combined DOCX in `Output/`
 - [x] **Batch filter tightened (2026-07-07):** Monthly Rent + Pending Approval
-      **and** HubSpot `createdate` on the **13th of the current month**
-      (intended run: 20th of each month). PandaDoc document name:
-      `Check Request - {m_p} - {createdate}` (assistance payment month +
-      HubSpot record create date). Option C: upload as document and send to
-      director (no template API).
+      + Type of Assistance = Rent + (production) create date on the 13th.
+      PandaDoc document name: `Check Request - {m_p} - {createdate}`.
+      Option C: upload as document and send to director.
+- [x] **Signature placement (2026-07-07):** moved from oversized DOCX field
+      tags to PandaDoc layout API — 120×33 pt fields at grid X=2, Y=8
+      (20% / 80% of page). Test doc `TEST Signature Layout v4 (2 pages)`
+      sent for review.
 
 ## Phase 2 — Document Generation (signature tag addition)
 Status: Complete (2026-07-06)

@@ -47,6 +47,9 @@ FILTER_CHECK_TYPE_VALUE = "Monthly Rent"
 FILTER_PAID_STATUS_PROPERTY = "paid_status"
 FILTER_PAID_STATUS_VALUE = "Pending Approval"
 
+FILTER_TYPE_OF_ASSISTANCE_PROPERTY = "type_of_rental_assitance"
+FILTER_TYPE_OF_ASSISTANCE_VALUE = "Rent"
+
 # HubSpot Deal create date — day-of-month for the monthly batch (records created
 # on the 13th; job is intended to run on the 20th of the same month).
 FILTER_CREATE_DATE_DAY = 13

@@ -42,8 +42,14 @@ def test_batch_search_filters_includes_all_three_criteria():
     property_names = [f["propertyName"] for f in filters]
     assert property_names.count("check_type") == 1
     assert property_names.count("paid_status") == 1
+    assert property_names.count("type_of_rental_assitance") == 1
     assert property_names.count(HUBSPOT_CREATEDATE_PROPERTY) == 2
-    assert len(filters) == 4
+    assert len(filters) == 5
+
+
+def test_batch_search_filters_without_create_date():
+    filters = batch_search_filters(date(2026, 7, 20), require_create_date=False)
+    assert len(filters) == 3
 
 
 def test_properties_to_fetch_includes_naming_fields():
@@ -104,7 +110,7 @@ def test_search_matching_deals_single_page():
     assert call_path == "/crm/v3/objects/deals/search"
     assert call_body["properties"] == properties_to_fetch(FAKE_FIELD_MAP)
     filters = call_body["filterGroups"][0]["filters"]
-    assert len(filters) == 4
+    assert len(filters) == 5
     assert filters[0]["propertyName"] == "check_type"
     assert filters[0]["value"] == "Monthly Rent"
     assert filters[1]["propertyName"] == "paid_status"

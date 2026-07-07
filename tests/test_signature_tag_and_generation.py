@@ -48,9 +48,7 @@ def _fill(include_signature_tag: bool) -> Document:
 
 def test_signature_tag_constants_shape():
     assert PANDADOC_SIGNATURE_ROLE
-    # Curly-brace notation — verified live 2026-07-06 (square brackets are
-    # silently ignored by PandaDoc's parser on this account).
-    assert PANDADOC_SIGNATURE_TAG.startswith("{signature:")
+    assert PANDADOC_SIGNATURE_TAG.startswith("{s:")
     assert PANDADOC_SIGNATURE_TAG.endswith("}")
     assert PANDADOC_SIGNATURE_ROLE in PANDADOC_SIGNATURE_TAG
 
