@@ -46,14 +46,20 @@ Status: Code complete (2026-07-06) — untested against live PandaDoc
       poll, auto-send; loud failures (7 tests passing)
 - [x] `run_batch.py` — orchestrator chaining Phase 1 → 2 → 3, with
       `--dry-run` running phases 1+2 only (3 tests passing)
-- [ ] **PENDING — needs API keys**: sandbox test (verify tag → signature
-      field on every page, then send) before pointing at production
+- [x] Live PandaDoc verification (2026-07-06, production key, test doc with
+      dummy data sent to the user's own email): **square-bracket tag notation
+      from the developer docs is silently ignored** — the curly-brace
+      notation `{signature:ProgramDirector____}` from PandaDoc's Help Center
+      parses correctly. Verified: 2-page test doc produced 2 signature
+      fields, recipient upgraded from CC to signer. Tag constant updated in
+      `csv_to_word_forms.py`.
 
 ## Remaining before first real run
 
 1. User reviews the dry-run DOCX (`Output/Check_Requests_Combined.docx`,
    126 forms) for field placement/formatting
-2. User adds `PANDADOC_API_KEY`, `PROGRAM_DIRECTOR_NAME`,
-   `PROGRAM_DIRECTOR_EMAIL` to `.env`
-3. PandaDoc sandbox send, verify the signature tag becomes a real field on
-   every page, then first real run: `python3 run_batch.py`
+2. User signs (or deletes) the "TEST v3" PandaDoc document sent to their
+   email to confirm the signing experience end-to-end
+3. Swap `.env`'s `PROGRAM_DIRECTOR_NAME`/`EMAIL` from the user's test
+   identity to the real Program Director
+4. First real run: `python3 run_batch.py`
