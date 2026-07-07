@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 from csv_to_word_forms import generate_combined_docx
 from hubspot_client import HubSpotClient
-from hubspot_pull import get_rows_for_batch
+from hubspot_pull import pull_batch
 from pandadoc_push import push_and_send
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -45,11 +45,12 @@ def run(
 
     # Phase 1 — HubSpot pull
     client = HubSpotClient(os.environ.get("HUBSPOT_API_KEY", ""))
-    rows = get_rows_for_batch(client)
+    rows, document_name = pull_batch(client)
     print(f"Phase 1: pulled {len(rows)} row(s) from HubSpot.")
     if not rows:
         print("Zero deals match the batch filter. Nothing to generate; exiting.")
         return 0
+    print(f"Phase 1: PandaDoc document name will be {document_name!r}.")
 
     # Phase 2 — combined DOCX with signature tags
     out = generate_combined_docx(
@@ -67,6 +68,7 @@ def run(
         api_key=os.environ.get("PANDADOC_API_KEY", ""),
         recipient_name=os.environ.get("PROGRAM_DIRECTOR_NAME", ""),
         recipient_email=os.environ.get("PROGRAM_DIRECTOR_EMAIL", ""),
+        document_name=document_name,
     )
     print(f"Phase 3: PandaDoc document {document_id} sent.")
     return 0

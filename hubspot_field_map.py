@@ -46,3 +46,12 @@ FILTER_CHECK_TYPE_VALUE = "Monthly Rent"
 
 FILTER_PAID_STATUS_PROPERTY = "paid_status"
 FILTER_PAID_STATUS_VALUE = "Pending Approval"
+
+# HubSpot Deal create date — day-of-month for the monthly batch (records created
+# on the 13th; job is intended to run on the 20th of the same month).
+FILTER_CREATE_DATE_DAY = 13
+HUBSPOT_CREATEDATE_PROPERTY = "createdate"
+
+# "Month (Month the Assistance is being paid for)" — used in the PandaDoc
+# document name, not on the Word form.
+ASSISTANCE_PAYMENT_MONTH_PROPERTY = "m_p"

@@ -15,7 +15,7 @@ def _fake_generate(rows, template_path, output_path, include_signature_tag=False
 
 @patch("run_batch.push_and_send")
 @patch("run_batch.generate_combined_docx", side_effect=_fake_generate)
-@patch("run_batch.get_rows_for_batch", return_value=SAMPLE_ROWS)
+@patch("run_batch.pull_batch", return_value=(SAMPLE_ROWS, "Check Request - July - 2026-07-13"))
 @patch("run_batch.HubSpotClient")
 def test_dry_run_skips_pandadoc(mock_client, mock_pull, mock_generate, mock_push, tmp_path, monkeypatch):
     monkeypatch.setenv("HUBSPOT_API_KEY", "hs-key")
@@ -32,7 +32,7 @@ def test_dry_run_skips_pandadoc(mock_client, mock_pull, mock_generate, mock_push
 
 @patch("run_batch.push_and_send", return_value="DOC123")
 @patch("run_batch.generate_combined_docx", side_effect=_fake_generate)
-@patch("run_batch.get_rows_for_batch", return_value=SAMPLE_ROWS)
+@patch("run_batch.pull_batch", return_value=(SAMPLE_ROWS, "Check Request - July - 2026-07-13"))
 @patch("run_batch.HubSpotClient")
 def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock_push, tmp_path, monkeypatch):
     monkeypatch.setenv("HUBSPOT_API_KEY", "hs-key")
@@ -49,11 +49,12 @@ def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock
     assert kwargs["api_key"] == "pd-key"
     assert kwargs["recipient_name"] == "Jane Director"
     assert kwargs["recipient_email"] == "jane@example.com"
+    assert kwargs["document_name"] == "Check Request - July - 2026-07-13"
 
 
 @patch("run_batch.push_and_send")
 @patch("run_batch.generate_combined_docx")
-@patch("run_batch.get_rows_for_batch", return_value=[])
+@patch("run_batch.pull_batch", return_value=([], ""))
 @patch("run_batch.HubSpotClient")
 def test_zero_rows_exits_cleanly_without_pandadoc(mock_client, mock_pull, mock_generate, mock_push, tmp_path, monkeypatch):
     monkeypatch.setenv("HUBSPOT_API_KEY", "hs-key")
