@@ -21,6 +21,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.enum.text import WD_UNDERLINE
 from docx.shared import Pt, RGBColor
@@ -29,7 +30,9 @@ from docxcompose.composer import Composer
 # PandaDoc field tag (legacy fallback if API placement is disabled). Curly-brace
 # notation verified live 2026-07-06. Underscores control width — keep short.
 PANDADOC_SIGNATURE_ROLE = "ProgramDirector"
+PANDADOC_SENIOR_HOUSING_PM_ROLE = "SeniorHousingProgramManager"
 PANDADOC_SIGNATURE_TAG = "{s:" + PANDADOC_SIGNATURE_ROLE + "___}"
+COVER_PAGE_HEADING = "Senior Housing Program Manager Signatures"
 
 # (CSV column header — any casing; matched via normalize_column_name, template label in Word doc)
 FIELD_MAPPING = [
@@ -706,15 +709,31 @@ def fill_template(
             )
 
 
+def generate_cover_page_docx() -> Document:
+    """Blank cover page prepended to every batch — signed by the SH Program Manager."""
+    doc = Document()
+    heading = doc.add_paragraph()
+    heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    run = heading.add_run(COVER_PAGE_HEADING)
+    run.bold = True
+    run.font.size = Pt(16)
+    doc.add_paragraph()
+    label = doc.add_paragraph("Signature:")
+    label.runs[0].font.size = Pt(12)
+    return doc
+
+
 def generate_combined_docx(
     rows: list[dict],
     template_path: Path | str,
     output_path: Path | str,
     include_signature_tag: bool = False,
+    include_cover_page: bool = True,
 ) -> Path | None:
     """
     Fill the template once per row dict and merge all forms into one combined
-    DOCX at output_path. Rows are plain dicts keyed by the CSV-style headers
+    DOCX at output_path. Optionally prepends a Senior Housing Program Manager
+    cover page. Rows are plain dicts keyed by the CSV-style headers
     FIELD_MAPPING expects (e.g. the output of hubspot_pull.get_rows_for_batch).
 
     Returns the output path, or None if rows is empty (no file written).
@@ -727,7 +746,9 @@ def generate_combined_docx(
 
     column_map = build_column_map(list(rows[0].keys()))
 
-    docs_to_merge = []
+    docs_to_merge: list[Document] = []
+    if include_cover_page:
+        docs_to_merge.append(generate_cover_page_docx())
     for row in rows:
         values = get_row_values(row, column_map)
         doc = Document(str(template_path))

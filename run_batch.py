@@ -80,20 +80,24 @@ def run(
     out = generate_combined_docx(
         rows, template_path, output_path, include_signature_tag=False
     )
-    print(f"Phase 2: generated {out} ({len(rows)} form(s)).")
+    print(f"Phase 2: generated {out} ({len(rows)} form(s) + cover page).")
 
     if dry_run:
         print("Dry run: skipping PandaDoc. Review the DOCX above by hand.")
         return 0
 
-    # Phase 3 — PandaDoc upload + send
+    total_pages = len(rows) + 1  # cover page + one form per deal
+
+    # Phase 3 — PandaDoc upload + send (SHPM first, then Program Director)
     document_id = push_and_send(
         out,
         api_key=os.environ.get("PANDADOC_API_KEY", ""),
-        recipient_name=os.environ.get("PROGRAM_DIRECTOR_NAME", ""),
-        recipient_email=os.environ.get("PROGRAM_DIRECTOR_EMAIL", ""),
+        shpm_name=os.environ.get("SENIOR_HOUSING_PROGRAM_MANAGER_NAME", ""),
+        shpm_email=os.environ.get("SENIOR_HOUSING_PROGRAM_MANAGER_EMAIL", ""),
+        director_name=os.environ.get("PROGRAM_DIRECTOR_NAME", ""),
+        director_email=os.environ.get("PROGRAM_DIRECTOR_EMAIL", ""),
         document_name=document_name,
-        page_count=len(rows),
+        page_count=total_pages,
     )
     print(f"Phase 3: PandaDoc document {document_id} sent.")
     return 0

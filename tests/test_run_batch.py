@@ -37,6 +37,8 @@ def test_dry_run_skips_pandadoc(mock_client, mock_pull, mock_generate, mock_push
 def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock_push, tmp_path, monkeypatch):
     monkeypatch.setenv("HUBSPOT_API_KEY", "hs-key")
     monkeypatch.setenv("PANDADOC_API_KEY", "pd-key")
+    monkeypatch.setenv("SENIOR_HOUSING_PROGRAM_MANAGER_NAME", "Emily Manager")
+    monkeypatch.setenv("SENIOR_HOUSING_PROGRAM_MANAGER_EMAIL", "emily@example.com")
     monkeypatch.setenv("PROGRAM_DIRECTOR_NAME", "Jane Director")
     monkeypatch.setenv("PROGRAM_DIRECTOR_EMAIL", "jane@example.com")
     out = tmp_path / "combined.docx"
@@ -47,10 +49,12 @@ def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock
     mock_push.assert_called_once()
     kwargs = mock_push.call_args[1]
     assert kwargs["api_key"] == "pd-key"
-    assert kwargs["recipient_name"] == "Jane Director"
-    assert kwargs["recipient_email"] == "jane@example.com"
+    assert kwargs["shpm_name"] == "Emily Manager"
+    assert kwargs["shpm_email"] == "emily@example.com"
+    assert kwargs["director_name"] == "Jane Director"
+    assert kwargs["director_email"] == "jane@example.com"
     assert kwargs["document_name"] == "Check Request - July - 2026-07-13"
-    assert kwargs["page_count"] == 1
+    assert kwargs["page_count"] == 2  # cover + 1 form
 
 
 @patch("run_batch.push_and_send")
