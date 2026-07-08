@@ -7,10 +7,10 @@ Runs the three phases in order:
   2. Fill + merge the Word template into one combined DOCX (csv_to_word_forms)
   3. Upload to PandaDoc, place signature/date fields, send (pandadoc_push)
 
-Monthly production schedule (automated via GitHub Actions on the 20th):
-  - Job runs on the 20th of each month
+Monthly production schedule (automated via GitHub Actions on the 16th):
+  - Job runs on the 16th of each month
   - Includes deals whose HubSpot createdate is the 13th of that same month
-    (July 20 → July 13 deals, October 20 → October 13 deals, etc.)
+    (July 16 → July 13 deals, October 16 → October 13 deals, etc.)
 
 Usage:
     python3 run_batch.py                         # production batch (create-date filter on)

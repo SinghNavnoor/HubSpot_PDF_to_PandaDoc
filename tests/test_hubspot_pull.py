@@ -211,7 +211,7 @@ def test_get_rows_for_batch_combines_search_and_mapping():
 
 def test_filter_create_date_day_is_13():
     assert FILTER_CREATE_DATE_DAY == 13
-    assert BATCH_SCHEDULED_RUN_DAY == 20
+    assert BATCH_SCHEDULED_RUN_DAY == 16
 
 
 def test_batch_create_date_target_uses_reference_month():

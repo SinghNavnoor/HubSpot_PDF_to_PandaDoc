@@ -53,9 +53,9 @@ FILTER_TYPE_OF_ASSISTANCE_VALUE = "Rent"
 # HubSpot Deal create date — day-of-month included in each monthly batch.
 # The scheduled job runs on BATCH_SCHEDULED_RUN_DAY; deals must have been
 # created on FILTER_CREATE_DATE_DAY of that same calendar month
-# (e.g. run July 20 → include deals created July 13).
+# (e.g. run July 16 → include deals created July 13).
 FILTER_CREATE_DATE_DAY = 13
-BATCH_SCHEDULED_RUN_DAY = 20
+BATCH_SCHEDULED_RUN_DAY = 16
 HUBSPOT_CREATEDATE_PROPERTY = "createdate"
 
 # "Month (Month the Assistance is being paid for)" — used in the PandaDoc
