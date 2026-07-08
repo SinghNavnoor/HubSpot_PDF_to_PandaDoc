@@ -54,7 +54,7 @@ def test_full_run_pushes_to_pandadoc(mock_client, mock_pull, mock_generate, mock
     assert kwargs["director_name"] == "Jane Director"
     assert kwargs["director_email"] == "jane@example.com"
     assert kwargs["document_name"] == "Check Request - July - 2026-07-13"
-    assert kwargs["page_count"] == 2  # cover + 1 form
+    assert kwargs["page_count"] == 1  # one form per row, no cover page
 
 
 @patch("run_batch.push_and_send")

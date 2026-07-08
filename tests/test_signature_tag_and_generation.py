@@ -4,14 +4,12 @@ from docx import Document
 from docx.shared import RGBColor
 
 from csv_to_word_forms import (
-    COVER_PAGE_HEADING,
     PANDADOC_SIGNATURE_ROLE,
     PANDADOC_SIGNATURE_TAG,
     build_column_map,
     collect_all_tables,
     fill_template,
     generate_combined_docx,
-    generate_cover_page_docx,
     get_row_values,
 )
 
@@ -89,11 +87,6 @@ def test_signature_tag_run_is_white():
     assert white_tag_runs >= 1
 
 
-def test_generate_cover_page_docx_has_heading():
-    doc = generate_cover_page_docx()
-    assert COVER_PAGE_HEADING in doc.paragraphs[0].text
-
-
 def test_generate_combined_docx_from_rows(tmp_path):
     rows = [dict(SAMPLE_ROW), {**SAMPLE_ROW, "Client Name": "Second Client"}]
     out_path = tmp_path / "combined.docx"
@@ -106,10 +99,38 @@ def test_generate_combined_docx_from_rows(tmp_path):
     assert out_path.is_file()
     merged = Document(str(out_path))
     text = _all_table_text(merged)
-    assert COVER_PAGE_HEADING in merged.paragraphs[0].text
     assert text.count(PANDADOC_SIGNATURE_TAG) == 2
     assert "Test Client" in text
     assert "Second Client" in text
+
+
+def test_generate_combined_docx_starts_with_first_form(tmp_path):
+    """No cover page: the document opens directly with form 1's table."""
+    out_path = tmp_path / "combined.docx"
+
+    generate_combined_docx([dict(SAMPLE_ROW)], TEMPLATE_PATH, out_path)
+
+    merged = Document(str(out_path))
+    first_element_tag = merged.element.body[0].tag
+    assert first_element_tag.endswith("}tbl")
+
+
+def test_generate_combined_docx_keeps_template_page_setup(tmp_path):
+    """Merged doc must keep the template's margins so each form fits one page."""
+    out_path = tmp_path / "combined.docx"
+
+    generate_combined_docx(
+        [dict(SAMPLE_ROW), {**SAMPLE_ROW, "Client Name": "Second Client"}],
+        TEMPLATE_PATH,
+        out_path,
+    )
+
+    template_section = Document(str(TEMPLATE_PATH)).sections[0]
+    merged_section = Document(str(out_path)).sections[0]
+    assert merged_section.left_margin == template_section.left_margin
+    assert merged_section.top_margin == template_section.top_margin
+    assert merged_section.page_width == template_section.page_width
+    assert merged_section.page_height == template_section.page_height
 
 
 def test_generate_combined_docx_without_tag(tmp_path):

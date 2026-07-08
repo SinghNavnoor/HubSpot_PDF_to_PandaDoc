@@ -3,8 +3,9 @@
 Push the combined check-request DOCX to PandaDoc and send it for signature.
 
 Uploads the DOCX, assigns two recipients in signing order (Senior Housing
-Program Manager first, then Program Director), places signature fields via
-the layout API, and auto-sends.
+Program Manager first, then Program Director), places fields via the layout
+API — Director signature on every page, SHPM manual date on page 1, Director
+autofilled date on pages 2+ — and auto-sends.
 """
 from __future__ import annotations
 
@@ -33,7 +34,9 @@ DEFAULT_POLL_INTERVAL_SECONDS = 2
 DRAFT_STATUS = "document.draft"
 ERROR_STATUSES = {"document.error", "document.declined", "document.voided"}
 
-# Director signature + signing-date on each check-request page (not the cover).
+# Director signature + signing-date on each check-request page. The date on
+# page 1 belongs to the Senior Housing Program Manager instead (manual entry,
+# so she must open and review the batch before it routes to the Director).
 PANDADOC_PAGE_WIDTH = 600
 PANDADOC_PAGE_HEIGHT = 850
 SIGNATURE_X_FRACTION = 0.2
@@ -43,15 +46,16 @@ SIGNATURE_WIDTH = 120
 SIGNATURE_HEIGHT = 33
 DATE_WIDTH = 90
 DATE_HEIGHT = 22
-# Cover page — SH Program Manager acknowledgment signature (page 1).
-COVER_SIGNATURE_X_FRACTION = 0.2
-COVER_SIGNATURE_Y_FRACTION = 0.55
 SIGNATURE_FIELDS_CHUNK_SIZE = 25
 
 REQUIRED_FIELD_SETTINGS = {"required": True}
 DATE_FIELD_SETTINGS = {
     "required": True,
     "autofilled": True,
+}
+MANUAL_DATE_FIELD_SETTINGS = {
+    "required": True,
+    "autofilled": False,
 }
 
 
@@ -116,8 +120,8 @@ def create_document_from_docx(
 ) -> str:
     """
     Upload the DOCX with two recipients in signing order:
-    1 — Senior Housing Program Manager (cover page)
-    2 — Program Director (each check-request form)
+    1 — Senior Housing Program Manager (reviews; fills the page-1 date)
+    2 — Program Director (signs each check-request form)
     """
     docx_path = Path(docx_path)
     payload = {
@@ -197,6 +201,14 @@ def get_document_details(client: PandaDocClient, document_id: str) -> dict:
     return _parse(response)
 
 
+def _recipient_signing_order(recipient: dict) -> int | None:
+    """Normalize signing_order from document details (may be int or str)."""
+    order = recipient.get("signing_order")
+    if order is None or order == "":
+        return None
+    return int(order)
+
+
 def get_recipient_id_by_role(details: dict, role: str) -> str:
     """Return a recipient UUID matching the PandaDoc role name."""
     for recipient in details.get("recipients") or []:
@@ -205,6 +217,45 @@ def get_recipient_id_by_role(details: dict, role: str) -> str:
             if recipient_id:
                 return recipient_id
     raise PandaDocAPIError(0, f"No recipient with role {role!r} on document")
+
+
+def get_shpm_and_director_recipient_ids(details: dict) -> tuple[str, str]:
+    """
+    Resolve SHPM (signing order 1) and Program Director (order 2) recipient ids.
+
+    PandaDoc often omits custom role names on documents created from file upload,
+    so we match signing_order first, then fall back to creation list order.
+    """
+    recipients = details.get("recipients") or []
+    if len(recipients) < 2:
+        raise PandaDocAPIError(
+            0, f"Expected 2 recipients on document, got {len(recipients)}"
+        )
+
+    shpm_id: str | None = None
+    director_id: str | None = None
+    for recipient in recipients:
+        recipient_id = recipient.get("id")
+        if not recipient_id:
+            continue
+        role = (recipient.get("role") or "").strip()
+        order = _recipient_signing_order(recipient)
+        if role == PANDADOC_SENIOR_HOUSING_PM_ROLE or order == 1:
+            shpm_id = recipient_id
+        elif role == PANDADOC_SIGNATURE_ROLE or order == 2:
+            director_id = recipient_id
+
+    ordered_ids = [r.get("id") for r in recipients if r.get("id")]
+    if not shpm_id and ordered_ids:
+        shpm_id = ordered_ids[0]
+    if not director_id and len(ordered_ids) >= 2:
+        director_id = ordered_ids[1]
+
+    if not shpm_id or not director_id:
+        raise PandaDocAPIError(
+            0, "Could not resolve Senior Housing PM and Program Director recipient ids"
+        )
+    return shpm_id, director_id
 
 
 def get_primary_recipient_id(details: dict) -> str:
@@ -261,12 +312,16 @@ def signature_field_payload(
     }
 
 
-def date_field_payload(page: int, recipient_id: str) -> dict:
-    """Signing-date field beside the Director signature."""
+def date_field_payload(page: int, recipient_id: str, *, autofilled: bool = True) -> dict:
+    """Signing-date field beside the Director signature line.
+
+    autofilled=True stamps the recipient's signing date automatically;
+    autofilled=False forces the recipient to type the date by hand.
+    """
     return {
         "type": "date",
         "assigned_to": recipient_id,
-        "settings": DATE_FIELD_SETTINGS,
+        "settings": DATE_FIELD_SETTINGS if autofilled else MANUAL_DATE_FIELD_SETTINGS,
         "layout": _field_layout(
             page,
             DATE_X_FRACTION,
@@ -277,43 +332,29 @@ def date_field_payload(page: int, recipient_id: str) -> dict:
     }
 
 
-def shpm_cover_signature_field_payload(page: int, recipient_id: str) -> dict:
-    """SH Program Manager acknowledgment signature on the cover page."""
-    return signature_field_payload(
-        page,
-        recipient_id,
-        x_fraction=COVER_SIGNATURE_X_FRACTION,
-        y_fraction=COVER_SIGNATURE_Y_FRACTION,
-    )
-
-
-def director_fields_for_page(page: int, recipient_id: str) -> list[dict]:
-    """Director signature + signing-date on one check-request page."""
-    return [
-        signature_field_payload(page, recipient_id),
-        date_field_payload(page, recipient_id),
-    ]
-
-
 def build_batch_signature_fields(
     total_page_count: int,
     shpm_recipient_id: str,
     director_recipient_id: str,
-    *,
-    has_cover_page: bool = True,
 ) -> list[dict]:
-    """All PandaDoc fields: cover SHPM signature + director fields on form pages."""
+    """
+    All PandaDoc fields for the batch. Every page gets the Director's
+    signature. The date on page 1 is the SH Program Manager's (manual,
+    required — she signs first and must review the batch); dates on the
+    remaining pages are the Director's, autofilled at signing.
+    """
     if total_page_count < 1:
         raise ValueError("total_page_count must be at least 1")
 
     fields: list[dict] = []
-    first_form_page = 1
-    if has_cover_page:
-        fields.append(shpm_cover_signature_field_payload(1, shpm_recipient_id))
-        first_form_page = 2
-
-    for page in range(first_form_page, total_page_count + 1):
-        fields.extend(director_fields_for_page(page, director_recipient_id))
+    for page in range(1, total_page_count + 1):
+        fields.append(signature_field_payload(page, director_recipient_id))
+        if page == 1:
+            fields.append(
+                date_field_payload(page, shpm_recipient_id, autofilled=False)
+            )
+        else:
+            fields.append(date_field_payload(page, director_recipient_id))
     return fields
 
 
@@ -323,28 +364,23 @@ def place_signature_fields(
     page_count: int,
     shpm_recipient_id: str | None = None,
     director_recipient_id: str | None = None,
-    *,
-    has_cover_page: bool = True,
 ) -> int:
     """
-    Place cover + Director signature fields via PandaDoc's fields API.
-    page_count is total pages (cover + one page per HubSpot deal).
+    Place signature/date fields via PandaDoc's fields API.
+    page_count is total pages (one page per HubSpot deal).
     """
     details = get_document_details(client, document_id)
-    if shpm_recipient_id is None:
-        shpm_recipient_id = get_recipient_id_by_role(
-            details, PANDADOC_SENIOR_HOUSING_PM_ROLE
-        )
-    if director_recipient_id is None:
-        director_recipient_id = get_recipient_id_by_role(
-            details, PANDADOC_SIGNATURE_ROLE
-        )
+    if shpm_recipient_id is None or director_recipient_id is None:
+        resolved_shpm, resolved_director = get_shpm_and_director_recipient_ids(details)
+        if shpm_recipient_id is None:
+            shpm_recipient_id = resolved_shpm
+        if director_recipient_id is None:
+            director_recipient_id = resolved_director
 
     all_fields = build_batch_signature_fields(
         page_count,
         shpm_recipient_id,
         director_recipient_id,
-        has_cover_page=has_cover_page,
     )
 
     created = 0
@@ -373,7 +409,6 @@ def push_and_send(
     page_count: int | None = None,
     *,
     use_api_signature_placement: bool = True,
-    has_cover_page: bool = True,
 ) -> str:
     """Full Phase 3: upload, wait for processing, place signatures, send."""
     docx_path = Path(docx_path)
@@ -407,12 +442,10 @@ def push_and_send(
     if use_api_signature_placement:
         if not page_count:
             raise ValueError("page_count is required for API signature placement")
-        count = place_signature_fields(
-            client, document_id, page_count, has_cover_page=has_cover_page
-        )
+        count = place_signature_fields(client, document_id, page_count)
         print(
-            f"Placed {count} field(s) (cover SHPM + director signature/date per form) "
-            "via PandaDoc layout API."
+            f"Placed {count} field(s) (director signature/date per form; "
+            "page-1 date assigned to the SH Program Manager) via PandaDoc layout API."
         )
 
     send_document(client, document_id)

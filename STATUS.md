@@ -30,6 +30,13 @@ Status: Complete (2026-07-06)
       tags to PandaDoc layout API — signature at X=2, Y=9.9; signing-date at
       X=8, same row. Both required; date uses per-field signing-date autofill
       (`settings.autofilled` via API — no workspace-wide date default needed).
+- [x] **Cover page dropped, SHPM review step added (2026-07-07):** the SH
+      Program Manager cover page broke pagination (merged doc inherited the
+      cover's default 1"/1.25" margins instead of the template's 0.5", and no
+      page break followed the cover — forms drifted across pages). Reverted to
+      the original layout: forms start on page 1, one per page. The SHPM still
+      signs first — she gets the page-1 date field (required, manual entry, no
+      autofill) so the batch routes to her for review before the Director.
 
 ## Phase 2 — Document Generation (signature tag addition)
 Status: Complete (2026-07-06)
@@ -47,9 +54,12 @@ Status: Complete (2026-07-06)
 ## Phase 3 — PandaDoc Push
 Status: Complete and verified live (2026-07-06)
 
-- [x] `pandadoc_push.py` — DOCX upload (field tags parsed), Program Director
-      recipient bound to the `ProgramDirector` signature role, processing
-      poll, auto-send; loud failures (7 tests passing)
+- [x] `pandadoc_push.py` — DOCX upload, two recipients in signing order
+      (SHPM first, then Program Director; recipient ids resolved by
+      signing_order since PandaDoc drops custom role names on file uploads),
+      field placement via layout API (Director signature every page, SHPM
+      manual date page 1, Director autofilled date pages 2+), processing
+      poll, auto-send; loud failures
 - [x] `run_batch.py` — orchestrator chaining Phase 1 → 2 → 3, with
       `--dry-run` running phases 1+2 only (3 tests passing)
 - [x] Live PandaDoc verification (2026-07-06, production key, test doc with

@@ -6,15 +6,16 @@ import pytest
 from csv_to_word_forms import PANDADOC_SENIOR_HOUSING_PM_ROLE, PANDADOC_SIGNATURE_ROLE
 from pandadoc_push import (
     DATE_FIELD_SETTINGS,
+    MANUAL_DATE_FIELD_SETTINGS,
     PandaDocAPIError,
     PandaDocClient,
     REQUIRED_FIELD_SETTINGS,
     build_batch_signature_fields,
     create_document_from_docx,
     date_field_payload,
+    get_shpm_and_director_recipient_ids,
     place_signature_fields,
     send_document,
-    shpm_cover_signature_field_payload,
     signature_field_payload,
     wait_until_draft,
 )
@@ -128,13 +129,6 @@ def test_signature_field_payload_uses_grid_coordinates():
     assert field["settings"] == REQUIRED_FIELD_SETTINGS
 
 
-def test_shpm_cover_signature_on_page_one():
-    field = shpm_cover_signature_field_payload(1, "shpm-1")
-    assert field["layout"]["page"] == 1
-    assert field["layout"]["position"]["offset_y"] == 467.5
-    assert field["assigned_to"] == "shpm-1"
-
-
 def test_date_field_payload_placed_beside_signature():
     field = date_field_payload(2, "recipient-1")
     assert field["type"] == "date"
@@ -142,27 +136,79 @@ def test_date_field_payload_placed_beside_signature():
     assert field["settings"] == DATE_FIELD_SETTINGS
 
 
-def test_build_batch_signature_fields_cover_plus_two_forms():
-    fields = build_batch_signature_fields(
-        3, "shpm-1", "dir-1", has_cover_page=True
-    )
-    assert len(fields) == 5
-    assert fields[0]["type"] == "signature"
-    assert fields[0]["layout"]["page"] == 1
-    assert fields[0]["assigned_to"] == "shpm-1"
-    assert fields[1]["layout"]["page"] == 2
-    assert fields[2]["layout"]["page"] == 2
-    assert fields[3]["layout"]["page"] == 3
-    assert fields[4]["layout"]["page"] == 3
+def test_manual_date_field_is_required_and_not_autofilled():
+    field = date_field_payload(1, "shpm-1", autofilled=False)
+    assert field["type"] == "date"
+    assert field["assigned_to"] == "shpm-1"
+    assert field["settings"] == MANUAL_DATE_FIELD_SETTINGS
+    assert field["settings"]["required"] is True
+    assert field["settings"]["autofilled"] is False
+
+
+def test_build_batch_signature_fields_three_forms():
+    """Page 1: director signature + SHPM manual date. Pages 2+: director sig + autofilled date."""
+    fields = build_batch_signature_fields(3, "shpm-1", "dir-1")
+    assert len(fields) == 6
+
+    page1_sig, page1_date = fields[0], fields[1]
+    assert page1_sig["type"] == "signature"
+    assert page1_sig["layout"]["page"] == 1
+    assert page1_sig["assigned_to"] == "dir-1"
+    assert page1_date["type"] == "date"
+    assert page1_date["layout"]["page"] == 1
+    assert page1_date["assigned_to"] == "shpm-1"
+    assert page1_date["settings"] == MANUAL_DATE_FIELD_SETTINGS
+
+    for page, (sig, date) in zip((2, 3), ((fields[2], fields[3]), (fields[4], fields[5]))):
+        assert sig["type"] == "signature"
+        assert sig["layout"]["page"] == page
+        assert sig["assigned_to"] == "dir-1"
+        assert date["type"] == "date"
+        assert date["layout"]["page"] == page
+        assert date["assigned_to"] == "dir-1"
+        assert date["settings"] == DATE_FIELD_SETTINGS
+
+
+def test_build_batch_signature_fields_single_page():
+    """A one-form batch still gives the SHPM her manual date on page 1."""
+    fields = build_batch_signature_fields(1, "shpm-1", "dir-1")
+    assert len(fields) == 2
+    assert fields[0]["assigned_to"] == "dir-1"
+    assert fields[1]["assigned_to"] == "shpm-1"
+    assert fields[1]["settings"] == MANUAL_DATE_FIELD_SETTINGS
+
+
+def test_get_shpm_and_director_recipient_ids_by_signing_order():
+    details = {
+        "recipients": [
+            {"id": "shpm-1", "role": "", "signing_order": 1},
+            {"id": "dir-1", "role": "", "signing_order": 2},
+        ]
+    }
+    shpm_id, director_id = get_shpm_and_director_recipient_ids(details)
+    assert shpm_id == "shpm-1"
+    assert director_id == "dir-1"
+
+
+def test_get_shpm_and_director_recipient_ids_fallback_to_list_order():
+    details = {
+        "recipients": [
+            {"id": "shpm-1", "role": "", "signing_order": None},
+            {"id": "dir-1", "role": "", "signing_order": None},
+        ]
+    }
+    shpm_id, director_id = get_shpm_and_director_recipient_ids(details)
+    assert shpm_id == "shpm-1"
+    assert director_id == "dir-1"
 
 
 @patch("pandadoc_push.requests.post")
 @patch("pandadoc_push.get_document_details")
-def test_place_signature_fields_skips_cover_for_director(mock_details, mock_post):
+def test_place_signature_fields_shpm_date_on_page_one(mock_details, mock_post):
     mock_details.return_value = {
         "recipients": [
-            {"id": "shpm-1", "role": PANDADOC_SENIOR_HOUSING_PM_ROLE},
-            {"id": "dir-1", "role": PANDADOC_SIGNATURE_ROLE},
+            {"id": "shpm-1", "role": "", "signing_order": 1},
+            {"id": "dir-1", "role": "", "signing_order": 2},
         ]
     }
     mock_post.return_value = Mock(ok=True, json=Mock(return_value={"fields": []}))
@@ -170,9 +216,10 @@ def test_place_signature_fields_skips_cover_for_director(mock_details, mock_post
     client = PandaDocClient("fake-key")
     count = place_signature_fields(client, "DOC123", page_count=3)
 
-    assert count == 5
+    assert count == 6
     body = mock_post.call_args[1]["json"]
     pages = [f["layout"]["page"] for f in body["fields"]]
-    assert pages == [1, 2, 2, 3, 3]
-    assert body["fields"][0]["assigned_to"] == "shpm-1"
-    assert body["fields"][1]["assigned_to"] == "dir-1"
+    assert pages == [1, 1, 2, 2, 3, 3]
+    assert body["fields"][0]["assigned_to"] == "dir-1"
+    assert body["fields"][1]["assigned_to"] == "shpm-1"
+    assert body["fields"][1]["settings"] == MANUAL_DATE_FIELD_SETTINGS

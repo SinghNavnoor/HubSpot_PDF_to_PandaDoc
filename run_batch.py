@@ -80,13 +80,13 @@ def run(
     out = generate_combined_docx(
         rows, template_path, output_path, include_signature_tag=False
     )
-    print(f"Phase 2: generated {out} ({len(rows)} form(s) + cover page).")
+    print(f"Phase 2: generated {out} ({len(rows)} form(s)).")
 
     if dry_run:
         print("Dry run: skipping PandaDoc. Review the DOCX above by hand.")
         return 0
 
-    total_pages = len(rows) + 1  # cover page + one form per deal
+    total_pages = len(rows)  # one form per deal
 
     # Phase 3 — PandaDoc upload + send (SHPM first, then Program Director)
     document_id = push_and_send(
