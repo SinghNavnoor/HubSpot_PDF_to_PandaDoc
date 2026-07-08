@@ -8,6 +8,7 @@
 #   PROGRAM_DIRECTOR_NAME, PROGRAM_DIRECTOR_EMAIL
 #
 # Manual run: Actions → Monthly Check Request Batch → Run workflow
+#   Default reference date 2026-06-13 → June 13 create-date deals (test batch).
 
 name: Monthly Check Request Batch
 
@@ -15,6 +16,14 @@ on:
   schedule:
     - cron: "0 16 20 * *"
   workflow_dispatch:
+    inputs:
+      reference_date:
+        description: >-
+          Any date in the target month (deals with createdate on the 13th of
+          that month). Default tests the June 2026 batch.
+        required: true
+        default: "2026-06-13"
+        type: string
 
 jobs:
   run-batch:
@@ -35,4 +44,9 @@ jobs:
           PANDADOC_API_KEY: ${{ secrets.PANDADOC_API_KEY }}
           PROGRAM_DIRECTOR_NAME: ${{ secrets.PROGRAM_DIRECTOR_NAME }}
           PROGRAM_DIRECTOR_EMAIL: ${{ secrets.PROGRAM_DIRECTOR_EMAIL }}
-        run: python3 run_batch.py
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 run_batch.py --reference-date "${{ inputs.reference_date }}"
+          else
+            python3 run_batch.py
+          fi
